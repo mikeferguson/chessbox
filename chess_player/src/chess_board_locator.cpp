@@ -91,13 +91,13 @@ bool accept(color_point& cp, pcl::PointCloud<point>::ConstPtr cloud)
 /** @brief Helper function to convert Eigen transformation to tf -- thanks to Garret Gallagher */
 tf::Transform tfFromEigen(Eigen::Matrix4f trans)
 {
-    btMatrix3x3 btm;
-    btm.setValue(trans(0,0),trans(0,1),trans(0,2),
-               trans(1,0),trans(1,1),trans(1,2),
-               trans(2,0),trans(2,1),trans(2,2));
-    btTransform ret;
-    ret.setOrigin(btVector3(trans(0,3),trans(1,3),trans(2,3)));
-    ret.setBasis(btm);
+    tf::Matrix3x3 mat;
+    mat.setValue(trans(0,0),trans(0,1),trans(0,2),
+                 trans(1,0),trans(1,1),trans(1,2),
+                 trans(2,0),trans(2,1),trans(2,2));
+    tf::Transform ret;
+    ret.setOrigin(tf::Vector3(trans(0,3),trans(1,3),trans(2,3)));
+    ret.setBasis(mat);
     return ret;
 }
 
@@ -354,7 +354,7 @@ class ChessBoardLocator
                         candidates.push_back(a8); 
                         candidates.push_back(h1);
                         // estimate transform
-                        pcl::estimateRigidTransformationSVD( candidates, board, t );
+                        // TODO: make this work again !!!! TODO pcl::estimateRigidTransformationSVD( candidates, board, t );
                         // transform whole cloud
                         pcl::PointCloud<point> data_transformed;
                         pcl::transformPointCloud( data_filtered, data_transformed, t );

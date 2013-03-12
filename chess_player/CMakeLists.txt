@@ -1,29 +1,49 @@
-cmake_minimum_required(VERSION 2.4.6)
-include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
+cmake_minimum_required(VERSION 2.8.3)
+project(chess_player)
 
-rosbuild_init()
 
-# add dynamic reconfigure api
-rosbuild_find_ros_package(dynamic_reconfigure)
-include(${dynamic_reconfigure_PACKAGE_PATH}/cmake/cfgbuild.cmake)
-gencfg()
+# setup
+find_package(catkin REQUIRED dynamic_reconfigure roscpp cv_bridge image_transport tf)
+find_package(Boost REQUIRED system filesystem)
+find_package(PCL REQUIRED)
+find_package(OpenCV REQUIRED)
 
-#set the default path for built executables to the "bin" directory
-set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
-#set the default path for built libraries to the "lib" directory
-set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
+link_directories(${catkin_LIBRARY_DIRS} ${Boost_LIBRARY_DIRS} ${OpenCV_LIBRARY_DIRS} ${PCL_LIBRARY_DIRS})
 
-#uncomment if you have defined messages
-#rosbuild_genmsg()
-#uncomment if you have defined services
-#rosbuild_gensrv()
+generate_dynamic_reconfigure_options(cfg/Locator.cfg
+                                     cfg/PieceExtractionConfig.cfg)
 
-rosbuild_add_executable(chess_board_locator src/chess_board_locator.cpp)
+catkin_package(DEPENDS dynamic_reconfigure pcl_ros pcl roscpp cv_bridge image_transport tf)
 
+include_directories(include
+                    SYSTEM
+                    ${Boost_INCLUDE_DIRS}
+                    ${catkin_INCLUDE_DIRS}
+                    ${PCL_INCLUDE_DIRS}
+                    ${OpenCV_INCLUDE_DIRS}
+                    cfg/cpp)
+
+# board locator
+add_executable(chess_board_locator src/chess_board_locator.cpp)
+target_link_libraries(chess_board_locator ${Boost_LIBRARIES}
+                                          ${catkin_LIBRARIES}
+                                          ${PCL_LIBRARIES}
+                                          ${OpenCV_LIBRARIES})
+add_dependencies(chess_board_locator chess_player_gencfg chess_msgs_gencpp)
+
+
+# piece extraction
+add_library(piece_extraction src/extract_pieces.cpp)
+target_link_libraries(piece_extraction ${Boost_LIBRARIES}
+                                       ${catkin_LIBRARIES}
+                                       ${PCL_LIBRARIES}
+                                       ${OpenCV_LIBRARIES})
+add_dependencies(piece_extraction chess_player_gencfg chess_msgs_gencpp)
+            
 # Point Cloud Library - Segmentation
-rosbuild_add_library (piece_extraction
-                      src/extract_pieces.cpp
-                     )
+#rosbuild_add_library (piece_extraction
+#                      src/extract_pieces.cpp
+#                     )
 
 #rosbuild_add_compile_flags (pcl_ros_segmentation ${SSE_FLAGS})
-rosbuild_link_boost (piece_extraction system filesystem)
+#rosbuild_link_boost (piece_extraction system filesystem)

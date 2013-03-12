@@ -122,7 +122,6 @@ pcl_ros::PieceExtraction::onInit ()
                  (use_indices_) ? "true" : "false", cluster_tolerance, spatial_locator);
 
   // Set given parameters here
-  impl_.setSpatialLocator (spatial_locator);
   impl_.setClusterTolerance (cluster_tolerance);
 }
 
