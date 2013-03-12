@@ -1,0 +1,7 @@
+gnuchess:
+  debian: gnuchess
+  ubuntu: gnuchess
+
+gnuchess-book:
+  debian: gnuchess-book
+  ubuntu: gnuchess-book

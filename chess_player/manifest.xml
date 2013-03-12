@@ -1,0 +1,39 @@
+<package>
+  <description brief="Executive for AAAI Chess Challenge" />
+  <author>Michael Ferguson</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/chess_player</url>
+  <depend package="rospy"/>
+  <depend package="chess_msgs"/>
+  <depend package="simple_arm_server"/>
+  <depend package="diagnostic_msgs"/>
+
+  <!-- from chess_board_locator -->
+  <depend package="roscpp"/>
+  <depend package="pcl_ros"/>
+  <depend package="opencv2"/>
+  <depend package="cv_bridge"/>
+  <depend package="sensor_msgs"/>
+  <depend package="tf"/>
+  <depend package="message_filters"/>
+  <depend package="dynamic_reconfigure"/>
+  <depend package="image_transport"/>
+  <depend package="std_srvs"/>
+
+  <!-- from chess_piece_locator
+  <depend package="roscpp" />
+  <depend package="pcl_ros" />
+  <depend package="chess_msgs" /> -->
+  <depend package="nodelet" />
+  <depend package="nodelet_topic_tools" />
+
+  <export>
+    <nodelet plugin="${prefix}/nodelets.xml" />
+  </export>
+
+  <rosdep name="gnuchess"/>
+  <rosdep name="gnuchess-book"/>
+</package>
+
+

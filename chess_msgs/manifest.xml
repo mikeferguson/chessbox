@@ -1,0 +1,12 @@
+<package>
+  <description brief="Message definitions for AAAI Chess 2011"/>
+  <author>Michael Ferguson</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/chess_msgs</url>
+  <depend package="rospy"/>
+  <depend package="roscpp"/>
+  <depend package="geometry_msgs"/>
+</package>
+
+

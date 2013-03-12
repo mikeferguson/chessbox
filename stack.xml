@@ -1,0 +1,13 @@
+<stack>
+  <description brief="Entry to AAAI 2011 Small Scale Manipulation Challenge">This package plays chess with a Kinect-enable robot.</description>
+  <author>Maintained by Michael Ferguson</author>
+  <license>BSD</license>  
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/albany_chess</url>
+  <depend stack="arbotix" /> <!-- arbotix_python -->
+  <depend stack="common_msgs" /> <!-- geometry_msgs, sensor_msgs -->
+  <depend stack="geometry" /> <!-- tf -->
+  <depend stack="ni" /> <!-- openni_camera -->
+  <depend stack="ros" />
+  <depend stack="ros_comm" /> <!-- roscpp, sensor_msgs, std_msgs, rospy, tf, geometry_msgs -->
+</stack>

@@ -1,0 +1,15 @@
+<launch>
+  <!-- run stable components of chess playing -->
+
+  <!-- also run maxwell_defs bringup.launch -->
+  <include file="$(find maxwell_defs)/launch/head_camera.launch" />
+  <include file="$(find chess_player)/launch/simple_arm_server.launch" />
+
+  <node pkg="chess_player" type="chess_board_locator" name="chess_board_locator" respawn="true"/>
+  <node pkg="chess_player" type="tf_turnpike.py" name="tf_turnpike"/>
+  <include file="$(find chess_player)/launch/run.launch" />
+
+  <node pkg="chess_player" type="festival_launcher.py" name="launcher"/>
+  <!--<node pkg="chess_player" type="chess_executive.py" name="chess_executive" output="screen"/>-->
+
+</launch>

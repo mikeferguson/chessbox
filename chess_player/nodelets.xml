@@ -1,0 +1,7 @@
+<library path="lib/libpiece_extraction">
+  <class name="chess_player/PieceExtraction" type="PieceExtraction" base_class_type="nodelet::Nodelet">
+    <description>
+      Extract pieces using euclidian clustering.
+    </description>
+  </class>
+</library>
