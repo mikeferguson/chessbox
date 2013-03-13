@@ -11,7 +11,7 @@ find_package(OpenCV REQUIRED)
 link_directories(${catkin_LIBRARY_DIRS} ${Boost_LIBRARY_DIRS} ${OpenCV_LIBRARY_DIRS} ${PCL_LIBRARY_DIRS})
 
 generate_dynamic_reconfigure_options(cfg/Locator.cfg
-                                     cfg/PieceExtractionConfig.cfg)
+                                     cfg/PieceExtraction.cfg)
 
 catkin_package(DEPENDS dynamic_reconfigure pcl_ros pcl roscpp cv_bridge image_transport tf)
 
