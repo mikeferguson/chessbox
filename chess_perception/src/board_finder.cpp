@@ -54,7 +54,7 @@ BoardFinder::BoardFinder()
 }
 
 bool BoardFinder::findCorners(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
-                              std::vector<pcl::PointXYZ>& points)
+                              pcl::PointCloud<pcl::PointXYZRGB>& points)
 {
     /* Get an OpenCV image from the cloud 
            TODO: update this code to be better/faster... */
@@ -188,8 +188,7 @@ bool BoardFinder::findCorners(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
         for ( size_t i = 0; i < corner_points_2d.size(); i++ )
         {
             cv::Point p2d = corner_points_2d[i];
-            pcl::PointXYZRGB pc = (*cloud)(p2d.x, p2d.y);
-            pcl::PointXYZ p3d = pcl::PointXYZ(pc.x, pc.y, pc.z);
+            pcl::PointXYZRGB p3d = (*cloud)(p2d.x, p2d.y);
             if( !isnan(p3d.x) && !isnan(p3d.y) && !isnan(p3d.z) )
             {
                 if( accept_3d(p3d, points) )
@@ -228,11 +227,11 @@ bool BoardFinder::accept(cv::Point& p, std::vector<cv::Point>& points)
 }
 
 /* Helper function to decide whether to accept a point */
-bool BoardFinder::accept_3d(pcl::PointXYZ& p, std::vector<pcl::PointXYZ>& points)
+bool BoardFinder::accept_3d(pcl::PointXYZRGB& p, pcl::PointCloud<pcl::PointXYZRGB>& cloud)
 {
-    for(size_t k = 0; k < points.size(); k++)
+    for(size_t k = 0; k < cloud.size(); k++)
     {   
-        pcl::PointXYZ tp = points[k];
+        pcl::PointXYZRGB tp = cloud[k];
         if( fabs(tp.x-p.x) + fabs(tp.y-p.y) + fabs(tp.z-p.z) < 0.05 )
             return false;
     }

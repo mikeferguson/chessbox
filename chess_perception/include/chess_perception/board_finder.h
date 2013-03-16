@@ -40,14 +40,14 @@ class BoardFinder
 
     /** \brief Find the potential points in the image. */
     bool findCorners(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
-                     std::vector<pcl::PointXYZ>& points);
+                     pcl::PointCloud<pcl::PointXYZRGB>& points);
 
   private:
     /** \brief Helper function to decide whether to accept a point */
     bool accept(cv::Point& p, std::vector<cv::Point>& points);
 
     /** \brief Helper function to decide whether to accept a 3d point */
-    bool accept_3d(pcl::PointXYZ& p, std::vector<pcl::PointXYZ>& points);
+    bool accept_3d(pcl::PointXYZRGB& p, pcl::PointCloud<pcl::PointXYZRGB>& cloud);
 
     /** \brief Helper function to find intersection of two lines */ 
     cv::Point findIntersection( cv::Vec4i a, cv::Vec4i b );
