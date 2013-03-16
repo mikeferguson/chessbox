@@ -46,8 +46,8 @@ PieceFinder::PieceFinder()
 
 int PieceFinder::findPieces(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
                             pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr table_hull,
-                            boost::shared_ptr< std::vector<pcl::PointXYZ> > pieces,
-                            boost::shared_ptr< std::vector<double> > weights)
+                            std::vector<pcl::PointXYZ>& pieces,
+                            std::vector<double>& weights)
 {
     /* Extract points above convex hull */
     pcl::PointIndices::Ptr inliers (new pcl::PointIndices());
@@ -74,8 +74,6 @@ int PieceFinder::findPieces(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
     ROS_DEBUG_STREAM("Piece Finder: Found " << clusters.size() << " clusters.");
 
     /* Determine Weights */
-    weights.reset(new std::vector<double>);
-    pieces.reset(new std::vector<pcl::PointXYZ>);
     for (size_t c = 0; c < clusters.size(); ++c)
     {
         /* find color/centroid of this cluster */
@@ -102,17 +100,17 @@ int PieceFinder::findPieces(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
 
         /* check if cluster overlaps any other */
         bool new_ = true;
-        for (size_t j = 0; j < pieces->size(); j++)
+        for (size_t j = 0; j < pieces.size(); j++)
         {
-            if( (fabs(p.x-(*pieces)[j].x) < 0.012) &&
-                (fabs(p.y-(*pieces)[j].y) < 0.012) )
+            if( (fabs(p.x-pieces[j].x) < 0.012) &&
+                (fabs(p.y-pieces[j].y) < 0.012) )
             {
-                double w1 = fabs((*weights)[j]);
+                double w1 = fabs(weights[j]);
                 double w2 = fabs(weight);
-                (*pieces)[j].x = ((*pieces)[j].x*w1 + p.x*w2)/(w1+w2);
-                (*pieces)[j].y = ((*pieces)[j].y*w1 + p.y*w2)/(w1+w2);
-                (*pieces)[j].z = ((*pieces)[j].z*w1 + p.z*w2)/(w1+w2);
-                (*weights)[j] += weight;
+                pieces[j].x = (pieces[j].x*w1 + p.x*w2)/(w1+w2);
+                pieces[j].y = (pieces[j].y*w1 + p.y*w2)/(w1+w2);
+                pieces[j].z = (pieces[j].z*w1 + p.z*w2)/(w1+w2);
+                weights[j] += weight;
                 new_ = false;
                 break;
             }
@@ -121,10 +119,10 @@ int PieceFinder::findPieces(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
         /* add cluster if not overlapping with another */
         if (new_){
             // TODO: add check for too large to be a chess piece
-            pieces->push_back(p);
-            weights->push_back(weight);
+            pieces.push_back(p);
+            weights.push_back(weight);
         }
     }
 
-    return weights->size();
+    return weights.size();
 }

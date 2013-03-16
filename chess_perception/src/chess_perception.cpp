@@ -39,10 +39,9 @@ class ChessPerception
   public:
     static const int square_size = 0.05715;
 
-    ChessPerception(ros::NodeHandle & n): nh_ (n), msgs_(0)
+    ChessPerception(ros::NodeHandle & n): nh_ (n)
     {
         debug_ = true;
-        skip_ = 1;
 
         /* Subscribe to just the cloud now */
         cloud_sub_ = nh_.subscribe("/camera/depth_registered/points", 1, &ChessPerception::cameraCallback, this);
@@ -59,13 +58,13 @@ class ChessPerception
          * This is a mostly 2d-operation that is quite fast, but somewhat unreliable.
          * We do this first, so if it fails we can abort the slower table/piece finding.
          */
-        boost::shared_ptr< std::vector<pcl::PointXYZ> > points;
+        std::vector<pcl::PointXYZ> points;
         if(!board_finder_.findCorners(cloud, points))
         {
             ROS_WARN("Unable to detect chess board corners.");
             return;
         }
-
+        
         /* Find the convex hull of the table */
         pcl::PointCloud<pcl::PointXYZRGB>::Ptr table_convex_hull (new pcl::PointCloud<pcl::PointXYZRGB>);
         if(!table_finder_.findTable(cloud, *table_convex_hull))
@@ -73,10 +72,10 @@ class ChessPerception
             ROS_ERROR("Unable to detect table.");
             return;
         }
-        
+
         /* Find potential centroids/colors of pieces */
-        boost::shared_ptr< std::vector<pcl::PointXYZ> > pieces;
-        boost::shared_ptr< std::vector<double> > weights;
+        std::vector<pcl::PointXYZ> pieces;
+        std::vector<double> weights;
         int piece_count = piece_finder_.findPieces(cloud, table_convex_hull, pieces, weights);
         if(piece_count == 0)
         {
@@ -99,9 +98,6 @@ class ChessPerception
     tf::TransformBroadcaster br_;
     tf::TransformListener listener_;
 
-    /* count of how many messages have been received */
-    unsigned int msgs_;
-    int skip_;
     bool debug_;
 
     /* smarts */

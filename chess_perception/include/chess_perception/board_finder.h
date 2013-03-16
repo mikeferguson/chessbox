@@ -40,7 +40,7 @@ class BoardFinder
 
     /** \brief Find the potential points in the image. */
     bool findCorners(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
-                     boost::shared_ptr< std::vector<pcl::PointXYZ> > points);
+                     std::vector<pcl::PointXYZ>& points);
 
   private:
     /** \brief Helper function to decide whether to accept a point */

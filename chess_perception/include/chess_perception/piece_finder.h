@@ -44,8 +44,8 @@ class PieceFinder
      */
     int findPieces(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
                    pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud_hull,
-                   boost::shared_ptr< std::vector<pcl::PointXYZ> > piece_centroids,
-                   boost::shared_ptr< std::vector<double> > weights);
+                   std::vector<pcl::PointXYZ>& pieces,
+                   std::vector<double>& weights);
     
   private:
     bool debug_;

@@ -54,7 +54,7 @@ BoardFinder::BoardFinder()
 }
 
 bool BoardFinder::findCorners(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
-                              boost::shared_ptr< std::vector<pcl::PointXYZ> > points)
+                              std::vector<pcl::PointXYZ>& points)
 {
     /* Get an OpenCV image from the cloud 
            TODO: update this code to be better/faster... */
@@ -184,8 +184,6 @@ bool BoardFinder::findCorners(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
 
     if(corner_points_2d.size() > point_threshold_)
     {
-        points.reset(new std::vector<pcl::PointXYZ>);
-
         /* Project to 3d */
         for ( size_t i = 0; i < corner_points_2d.size(); i++ )
         {
@@ -194,17 +192,17 @@ bool BoardFinder::findCorners(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
             pcl::PointXYZ p3d = pcl::PointXYZ(pc.x, pc.y, pc.z);
             if( !isnan(p3d.x) && !isnan(p3d.y) && !isnan(p3d.z) )
             {
-                if( accept_3d(p3d, *points) )
+                if( accept_3d(p3d, points) )
                 {
-                    points->push_back( p3d );
+                    points.push_back( p3d );
                 }
             }
             // TODO: add some means of searching for a point near here that is not a nan.
         }
 
-        ROS_DEBUG_STREAM("Board Finder: Found " << points->size() << " 3d points");
+        ROS_DEBUG_STREAM("Board Finder: Found " << points.size() << " 3d points");
     
-        if(points->size() < point_threshold_)
+        if(points.size() < point_threshold_)
             return false;
 
         if(debug_)
