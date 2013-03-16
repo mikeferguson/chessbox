@@ -22,7 +22,7 @@ Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #define PIECE_FINDER_H_
 
 #include <ros/ros.h>
-#include <pcl/point_cloud.h>
+#include <pcl_ros/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/PointIndices.h>
 #include <pcl/segmentation/extract_polygonal_prism_data.h>
@@ -48,9 +48,13 @@ class PieceFinder
                    boost::shared_ptr< std::vector<double> > weights);
     
   private:
+    bool debug_;
+
     pcl::ExtractPolygonalPrismData<pcl::PointXYZRGB> extract_data_;
     pcl::ExtractIndices<pcl::PointXYZRGB> extract_indices_;
     pcl::EuclideanClusterExtraction<pcl::PointXYZRGB> cluster_;
+
+    ros::Publisher pieces_cloud_pub_;
 };
 
 #endif

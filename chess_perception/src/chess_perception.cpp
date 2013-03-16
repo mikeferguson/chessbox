@@ -67,8 +67,8 @@ class ChessPerception
         }
 
         /* Find the convex hull of the table */
-        pcl::PointCloud<pcl::PointXYZRGB>::Ptr table_convex_hull;
-        if(!table_finder_.findTable(cloud, table_convex_hull))
+        pcl::PointCloud<pcl::PointXYZRGB>::Ptr table_convex_hull (new pcl::PointCloud<pcl::PointXYZRGB>);
+        if(!table_finder_.findTable(cloud, *table_convex_hull))
         {
             ROS_ERROR("Unable to detect table.");
             return;

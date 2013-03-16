@@ -48,7 +48,7 @@ class TableFinder
      *  \returns true if table is found.
      */
     bool findTable(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
-                   pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_hull);
+                   pcl::PointCloud<pcl::PointXYZRGB>& cloud_hull);
 
   private:
     bool debug_;

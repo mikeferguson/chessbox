@@ -55,7 +55,7 @@ TableFinder::TableFinder()
 }
 
 bool TableFinder::findTable(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
-                            pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_hull)
+                            pcl::PointCloud<pcl::PointXYZRGB>& cloud_hull)
 {
     ROS_DEBUG_STREAM("Table Finder: Input cloud has " << cloud->size() << " points.");
 
@@ -99,11 +99,10 @@ bool TableFinder::findTable(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
     ROS_DEBUG_STREAM("Table Finder: Projected cloud has " << cloud_projected->size() << " points.");
 
     /* Compute convex hull */
-    cloud_hull.reset(new pcl::PointCloud<pcl::PointXYZRGB>);
     convexhull_.setDimension(2);
     convexhull_.setInputCloud(cloud_projected);
-    convexhull_.reconstruct(*cloud_hull);
-    ROS_DEBUG_STREAM("Table Finder: Hull has " << cloud_hull->size() << " points.");
+    convexhull_.reconstruct(cloud_hull);
+    ROS_DEBUG_STREAM("Table Finder: Hull has " << cloud_hull.size() << " points.");
 
     if(debug_)
     {

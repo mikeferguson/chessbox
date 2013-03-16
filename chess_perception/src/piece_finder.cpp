@@ -22,7 +22,15 @@ Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 PieceFinder::PieceFinder()
 {
+    ros::NodeHandle nh ("~");
+
     /* TODO read params from parameter server */
+    debug_ = true;
+
+    if(debug_)
+    {
+        pieces_cloud_pub_ = nh.advertise< pcl::PointCloud<pcl::PointXYZRGB> >("pieces", 1);
+    }
 
     /* Setup extract polygonal prism data */
     extract_data_.setHeightLimits(0.01, 0.2);
@@ -34,7 +42,6 @@ PieceFinder::PieceFinder()
     cluster_.setClusterTolerance(0.01);
     cluster_.setMinClusterSize(10);
     cluster_.setMaxClusterSize(3000); // TODO: is this too low?
-
 }
 
 int PieceFinder::findPieces(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
@@ -44,8 +51,8 @@ int PieceFinder::findPieces(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
 {
     /* Extract points above convex hull */
     pcl::PointIndices::Ptr inliers (new pcl::PointIndices());
-    extract_data_.setInputPlanarHull(table_hull);
     extract_data_.setInputCloud(cloud);
+    extract_data_.setInputPlanarHull(table_hull);
     extract_data_.segment(*inliers);
 
     /* Extract points from indices found above */
@@ -53,6 +60,10 @@ int PieceFinder::findPieces(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
     extract_indices_.setInputCloud(cloud);
     extract_indices_.setIndices(inliers);
     extract_indices_.filter(*cloud_pieces);
+    ROS_DEBUG_STREAM("Piece Finder: Extract points has " << cloud_pieces->size() << " points.");
+
+    if(debug_)
+        pieces_cloud_pub_.publish(cloud_pieces);
 
     /* Cluster */
     pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZRGB>);
@@ -60,6 +71,7 @@ int PieceFinder::findPieces(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
     cluster_.setSearchMethod(tree);
     cluster_.setInputCloud(cloud_pieces);
     cluster_.extract(clusters);
+    ROS_DEBUG_STREAM("Piece Finder: Found " << clusters.size() << " clusters.");
 
     /* Determine Weights */
     weights.reset(new std::vector<double>);
