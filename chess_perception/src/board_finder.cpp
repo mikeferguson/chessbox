@@ -93,7 +93,7 @@ bool BoardFinder::findCorners(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
     /* Do a hough transformation to find lines */
     std::vector<cv::Vec4i> lines;
     cv::HoughLinesP(dst, lines, h_rho_, CV_PI/180, h_threshold_, h_min_length_, 10 );
-    ROS_INFO("Found %d lines", (int) lines.size());
+    ROS_DEBUG("Found %d lines", (int) lines.size());
 
     /* Split into vertical/horizontal lines */
     std::vector<int> h_indexes, v_indexes;
@@ -180,7 +180,7 @@ bool BoardFinder::findCorners(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
         }
     }
 
-    ROS_INFO_STREAM("Found " << corner_points_2d.size() << " 2d points");
+    ROS_DEBUG_STREAM("Board Finder: Found " << corner_points_2d.size() << " 2d points");
 
     if(corner_points_2d.size() > point_threshold_)
     {
@@ -202,7 +202,7 @@ bool BoardFinder::findCorners(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
             // TODO: add some means of searching for a point near here that is not a nan.
         }
 
-        ROS_INFO_STREAM("Found " << points->size() << " 3d points");
+        ROS_DEBUG_STREAM("Board Finder: Found " << points->size() << " 3d points");
     
         if(points->size() < point_threshold_)
             return false;
@@ -259,7 +259,6 @@ cv::Point BoardFinder::findIntersection( cv::Vec4i a, cv::Vec4i b )
     if( (x>=0) && (x<640) && (y>=0) && (y<480) ){
         return cv::Point((int)x,(int)y);
     }else{
-        ROS_INFO_STREAM(x << " " << y);
         return cv::Point(-1,-1);
     }
 }

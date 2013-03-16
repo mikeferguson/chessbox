@@ -22,7 +22,17 @@ Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 TableFinder::TableFinder()
 {
+    ros::NodeHandle nh ("~");
+
     /* TODO read params from parameter server */
+    debug_ = true;
+    leaf_size_ = 0.01;
+
+    if(debug_)
+    {
+        table_cloud_pub_ = nh.advertise< pcl::PointCloud<pcl::PointXYZRGB> >("table", 1);
+        hull_cloud_pub_ = nh.advertise< pcl::PointCloud<pcl::PointXYZRGB> >("table_hull", 1);
+    }
 
     /* Setup voxel grid */
     voxel_.setLeafSize(leaf_size_, leaf_size_, leaf_size_);
@@ -47,10 +57,13 @@ TableFinder::TableFinder()
 bool TableFinder::findTable(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
                             pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_hull)
 {
+    ROS_DEBUG_STREAM("Table Finder: Input cloud has " << cloud->size() << " points.");
+
     /* Apply voxel filter */
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_downsampled (new pcl::PointCloud<pcl::PointXYZRGB>);
     voxel_.setInputCloud(cloud);
     voxel_.filter(*cloud_downsampled);
+    ROS_DEBUG_STREAM("Table Finder: Downsampled cloud has " << cloud_downsampled->size() << " points.");
 
     /* Estimate point normals */
     pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZRGB>);
@@ -58,6 +71,7 @@ bool TableFinder::findTable(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
     normals_.setInputCloud(cloud_downsampled);
     normals_.setSearchMethod(tree);
     normals_.compute(*cloud_normals);
+    ROS_DEBUG_STREAM("Table Finder: Normal cloud has " << cloud_normals->size() << " points.");
     
     /* Segment table plane, extract points */
     pcl::PointIndices::Ptr inliers (new pcl::PointIndices());
@@ -68,24 +82,34 @@ bool TableFinder::findTable(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
 
     if(inliers->indices.size() == 0)
     {
-        ROS_ERROR("Failed to find a planar model for the table.");
+        ROS_ERROR("Table Finder: Failed to find a planar model for the table.");
         return false;
     }
 
-    ROS_INFO_STREAM("Model Coefficients: " << coefficients->values[0] << " "
-                                           << coefficients->values[1] << " "
-                                           << coefficients->values[2] << " "
-                                           << coefficients->values[3]);
+    ROS_DEBUG_STREAM("Table Finder: Model Coefficients: " << coefficients->values[0] << " "
+                                                         << coefficients->values[1] << " "
+                                                         << coefficients->values[2] << " "
+                                                         << coefficients->values[3]);
     /* Project inliers */
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_projected (new pcl::PointCloud<pcl::PointXYZRGB>);
     project_.setInputCloud(cloud_downsampled);
     project_.setModelCoefficients(coefficients);
+    project_.setIndices(inliers);
     project_.filter(*cloud_projected);
-    
+    ROS_DEBUG_STREAM("Table Finder: Projected cloud has " << cloud_projected->size() << " points.");
+
     /* Compute convex hull */
     cloud_hull.reset(new pcl::PointCloud<pcl::PointXYZRGB>);
+    convexhull_.setDimension(2);
     convexhull_.setInputCloud(cloud_projected);
     convexhull_.reconstruct(*cloud_hull);
+    ROS_DEBUG_STREAM("Table Finder: Hull has " << cloud_hull->size() << " points.");
+
+    if(debug_)
+    {
+        table_cloud_pub_.publish(cloud_projected);
+        hull_cloud_pub_.publish(cloud_hull);
+    }
 
     return true;
 }

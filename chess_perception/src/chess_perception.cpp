@@ -51,8 +51,6 @@ class ChessPerception
     /** \brief Main loop */
     void cameraCallback ( pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud )
     {
-        ROS_INFO("New image/cloud.");
-
         /* Transform cloud into base_link
         pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_transformed (new pcl::PointCloud<pcl::PointXYZRGB>);
         pcl_ros::transformPointCloud("base_link", *cloud, *cloud_transformed, listener_);*/
@@ -64,7 +62,7 @@ class ChessPerception
         boost::shared_ptr< std::vector<pcl::PointXYZ> > points;
         if(!board_finder_.findCorners(cloud, points))
         {
-            ROS_ERROR("Unable to detect chess board corners.");
+            ROS_WARN("Unable to detect chess board corners.");
             return;
         }
 
