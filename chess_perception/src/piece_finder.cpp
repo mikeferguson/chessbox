@@ -83,7 +83,7 @@ PieceFinder::PieceFinder()
     /* Setup clustering */
     cluster_.setClusterTolerance(0.01);
     cluster_.setMinClusterSize(1);
-    cluster_.setMaxClusterSize(3000); // TODO: is this too low?
+    cluster_.setMaxClusterSize(3000);
 }
 
 int PieceFinder::findPieces(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,

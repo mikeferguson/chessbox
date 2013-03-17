@@ -3,14 +3,17 @@
 Motivation:
  * pcl_ros, nodelets are unreliably maintained
  * perception could be much better with more info
+ * eliminate need for camera_turnpike
 
 Changes:
 Is now a single node, finds board and pieces. Sub-modules include:
-   * table_finder -- locates convex hull of table
-   * piece_finder -- locates candidate pieces by clustering points above the hull, merging undersized clusters, and determining the color/weight of clusters
-   * board_finder -- locates candidate board points (defined as the center of a square)
-   * chess_perception -- merges all info and optimizes. publishes tf, Piece message.
+   * board_finder -- finds a transform between the chess board and world. Publishes tf.
+   * piece_finder -- finds pieces above the board.
+   * chess_perception -- merges all info (and optimizes?). publishes board/piece message.
 
 Future Improvements
+ * make board_finder robust to missing/added intersections
+ * improve board_finder intersection acceptance test
+ * load parameters from param server
  * take into account expected board state (from player node)
  * piece_finder should ignore any cluster that is physically too large to be a piece
