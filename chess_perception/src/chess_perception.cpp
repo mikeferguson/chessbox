@@ -31,6 +31,8 @@ Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #include <chess_perception/piece_finder.h>
 #include <chess_perception/board_finder.h>
 
+#include <pcl/filters/project_inliers.h>
+
 /** \brief This class handles the estimation, and ties together the other
  *  aspects of board/piece perception.
  */
@@ -45,6 +47,9 @@ class ChessPerception
 
         /* Subscribe to just the cloud now */
         cloud_sub_ = nh_.subscribe("/camera/depth_registered/points", 1, &ChessPerception::cameraCallback, this);
+
+        ros::NodeHandle nh ("~");
+        projected_points_cloud_pub_ = nh.advertise< pcl::PointCloud<pcl::PointXYZRGB> >("projected_points", 1);
     }
 
     /** \brief Main loop */
@@ -58,12 +63,13 @@ class ChessPerception
          * This is a mostly 2d-operation that is quite fast, but somewhat unreliable.
          * We do this first, so if it fails we can abort the slower table/piece finding.
          */
-        std::vector<pcl::PointXYZ> points;
-        if(!board_finder_.findCorners(cloud, points))
+        pcl::PointCloud<pcl::PointXYZRGB>::Ptr corner_points (new pcl::PointCloud<pcl::PointXYZRGB>);
+        if(!board_finder_.findCorners(cloud, *corner_points))
         {
             ROS_WARN("Unable to detect chess board corners.");
             return;
         }
+        ROS_INFO_STREAM("board_finder_ found " << corner_points->size() << " corner points.");
         
         /* Find the convex hull of the table */
         pcl::PointCloud<pcl::PointXYZRGB>::Ptr table_convex_hull (new pcl::PointCloud<pcl::PointXYZRGB>);
@@ -84,6 +90,17 @@ class ChessPerception
         }
 
         /* Project to plane */
+        pcl::ProjectInliers<pcl::PointXYZRGB> project;
+        pcl::PointCloud<pcl::PointXYZRGB>::Ptr projected_corner_points (new pcl::PointCloud<pcl::PointXYZRGB>);
+        project.setInputCloud(corner_points);
+        project.setModelCoefficients(table_finder_.getCoefficients());
+        project.filter(*projected_corner_points);
+        ROS_INFO_STREAM("Projected " << projected_corner_points->size() << " corner points to table plane.");
+
+        if(debug_)
+        {
+          projected_points_cloud_pub_.publish(projected_corner_points);
+        }
 
         /* estimate board/piece pose */
 
@@ -95,6 +112,7 @@ class ChessPerception
     ros::NodeHandle nh_;
     ros::Subscriber cloud_sub_;
     ros::Publisher cloud_pub_;
+    ros::Publisher projected_points_cloud_pub_;
     tf::TransformBroadcaster br_;
     tf::TransformListener listener_;
 
