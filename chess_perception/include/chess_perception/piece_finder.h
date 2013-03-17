@@ -23,6 +23,7 @@ Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 #include <ros/ros.h>
 #include <pcl_ros/point_cloud.h>
+#include <pcl_ros/transforms.h>
 #include <pcl/point_types.h>
 #include <pcl/PointIndices.h>
 #include <pcl/segmentation/extract_polygonal_prism_data.h>
@@ -43,7 +44,7 @@ class PieceFinder
      *  \returns number of pieces found.
      */
     int findPieces(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
-                   pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud_hull,
+                   tf::Transform& board_transform,
                    std::vector<pcl::PointXYZ>& pieces,
                    std::vector<double>& weights);
     
@@ -55,6 +56,7 @@ class PieceFinder
     pcl::EuclideanClusterExtraction<pcl::PointXYZRGB> cluster_;
 
     ros::Publisher pieces_cloud_pub_;
+    pcl::PointCloud<pcl::PointXYZRGB> hull_untransformed_;
 };
 
 #endif
