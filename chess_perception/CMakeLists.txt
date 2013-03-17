@@ -20,8 +20,7 @@ include_directories(include
                    )
 
 # node
-add_executable(chess_perception src/table_finder.cpp
-                                src/piece_finder.cpp
+add_executable(chess_perception src/piece_finder.cpp
                                 src/board_finder.cpp
                                 src/chess_perception.cpp)
 target_link_libraries(chess_perception ${Boost_LIBRARIES}

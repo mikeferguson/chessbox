@@ -27,11 +27,10 @@ Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #include <pcl_ros/point_cloud.h>
 #include <pcl_ros/transforms.h>
 
-#include <chess_perception/table_finder.h>
 #include <chess_perception/piece_finder.h>
 #include <chess_perception/board_finder.h>
 
-#include <pcl/filters/project_inliers.h>
+#include <chess_msgs/ChessBoard.h>
 
 /** \brief This class handles the estimation, and ties together the other
  *  aspects of board/piece perception.
@@ -47,64 +46,53 @@ class ChessPerception
 
         /* Subscribe to just the cloud now */
         cloud_sub_ = nh_.subscribe("/camera/depth_registered/points", 1, &ChessPerception::cameraCallback, this);
-
-        ros::NodeHandle nh ("~");
-        projected_points_cloud_pub_ = nh.advertise< pcl::PointCloud<pcl::PointXYZRGB> >("projected_points", 1);
+        output_ = nh_.advertise<chess_msgs::ChessBoard>("chess_board_state", 1);
     }
 
     /** \brief Main loop */
     void cameraCallback ( pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud )
     {
-        /* Transform cloud into base_link
-        pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_transformed (new pcl::PointCloud<pcl::PointXYZRGB>);
-        pcl_ros::transformPointCloud("base_link", *cloud, *cloud_transformed, listener_);*/
-
         /* Find potential corner points of board.
          * This is a mostly 2d-operation that is quite fast, but somewhat unreliable.
          * We do this first, so if it fails we can abort the slower table/piece finding.
          */
         pcl::PointCloud<pcl::PointXYZRGB>::Ptr corner_points (new pcl::PointCloud<pcl::PointXYZRGB>);
-        if(!board_finder_.findCorners(cloud, *corner_points))
+        tf::Transform tr;
+        if(!board_finder_.findBoard(cloud, tr))
         {
-            ROS_WARN("Unable to detect chess board corners.");
+            ROS_WARN("Unable to detect chess board.");
             return;
         }
-        ROS_INFO_STREAM("board_finder_ found " << corner_points->size() << " corner points.");
-        
-        /* Find the convex hull of the table */
-        pcl::PointCloud<pcl::PointXYZRGB>::Ptr table_convex_hull (new pcl::PointCloud<pcl::PointXYZRGB>);
-        if(!table_finder_.findTable(cloud, *table_convex_hull))
-        {
-            ROS_ERROR("Unable to detect table.");
-            return;
-        }
+        /* Publish board estimate */
+        br_.sendTransform(tf::StampedTransform(tr, ros::Time::now(), cloud->header.frame_id, "chess_board"));
 
         /* Find potential centroids/colors of pieces */
         std::vector<pcl::PointXYZ> pieces;
         std::vector<double> weights;
-        int piece_count = piece_finder_.findPieces(cloud, table_convex_hull, pieces, weights);
+        int piece_count = piece_finder_.findPieces(cloud, tr, pieces, weights);
         if(piece_count == 0)
         {
             ROS_ERROR("Unable to detect pieces.");
             return;
         }
-
-        /* Project to plane */
-        pcl::ProjectInliers<pcl::PointXYZRGB> project;
-        pcl::PointCloud<pcl::PointXYZRGB>::Ptr projected_corner_points (new pcl::PointCloud<pcl::PointXYZRGB>);
-        project.setInputCloud(corner_points);
-        project.setModelCoefficients(table_finder_.getCoefficients());
-        project.filter(*projected_corner_points);
-        ROS_INFO_STREAM("Projected " << projected_corner_points->size() << " corner points to table plane.");
-
-        if(debug_)
+        ROS_INFO_STREAM("Found " << piece_count << " pieces.");
+        /* Publish piece estimate */
+        chess_msgs::ChessBoard cb;
+        for (size_t i = 0; i < piece_count; i++)
         {
-          projected_points_cloud_pub_.publish(projected_corner_points);
+            chess_msgs::ChessPiece p;
+            p.header.frame_id = "chess_board";
+            p.header.stamp = cloud->header.stamp;
+            p.pose.position.x = pieces[i].x;
+            p.pose.position.y = pieces[i].y;
+            p.pose.position.z = pieces[i].z;
+            if(weights[i] > 0)
+                p.type = chess_msgs::ChessPiece::WHITE_UNKNOWN;
+            else
+                p.type = chess_msgs::ChessPiece::BLACK_UNKNOWN;
+            cb.pieces.push_back(p);
         }
-
-        /* estimate board/piece pose */
-
-        /* publish board estimate */
+        output_.publish(cb);
     }
 
   private:
@@ -112,6 +100,7 @@ class ChessPerception
     ros::NodeHandle nh_;
     ros::Subscriber cloud_sub_;
     ros::Publisher cloud_pub_;
+    ros::Publisher output_;
     ros::Publisher projected_points_cloud_pub_;
     tf::TransformBroadcaster br_;
     tf::TransformListener listener_;
@@ -120,7 +109,6 @@ class ChessPerception
 
     /* smarts */
     BoardFinder board_finder_;
-    TableFinder table_finder_;
     PieceFinder piece_finder_;
 };
 
