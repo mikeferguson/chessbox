@@ -22,12 +22,16 @@ Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #define POINT_FINDER_H_
 
 #include <ros/ros.h>
+#include <tf/transform_broadcaster.h> // TODO: find appropriate include file
+
 #include <pcl/point_types.h>
 #include <pcl_ros/point_cloud.h>
 #include <cv_bridge/cv_bridge.h>
 
 #include <opencv/cv.h>
 #include <image_transport/image_transport.h>
+
+#include <pcl/registration/transformation_estimation_svd.h>
 
 /** \class BoardFinder
  *  \brief Finds potential points of the chess board.
@@ -39,8 +43,8 @@ class BoardFinder
     virtual ~BoardFinder() {};
 
     /** \brief Find the potential points in the image. */
-    bool findCorners(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
-                     pcl::PointCloud<pcl::PointXYZRGB>& points);
+    bool findBoard(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
+                   tf::Transform& board);
 
   private:
     /** \brief Helper function to decide whether to accept a point */
@@ -66,8 +70,11 @@ class BoardFinder
     /* configuration */
     bool debug_;
 
-    image_transport::Publisher pub_;
+    ros::Publisher cloud_pub_;
+    image_transport::Publisher image_pub_;
     cv_bridge::CvImagePtr bridge_;
+
+    pcl::registration::TransformationEstimationSVD<pcl::PointXYZRGB, pcl::PointXYZ> reg_;
 };
 
 #endif

@@ -22,6 +22,19 @@ Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 #include <ros/ros.h>
 
+/** \brief Helper function to convert Eigen transformation to tf -- thanks to Garret Gallagher */
+tf::Transform tfFromEigen(Eigen::Matrix4f trans)
+{
+    tf::Matrix3x3 mat;
+    mat.setValue(trans(0,0),trans(0,1),trans(0,2),
+                 trans(1,0),trans(1,1),trans(1,2),
+                 trans(2,0),trans(2,1),trans(2,2));
+    tf::Transform ret;
+    ret.setOrigin(tf::Vector3(trans(0,3),trans(1,3),trans(2,3)));
+    ret.setBasis(mat);
+    return ret;
+}
+
 /** Sort points based only on x-component */
 bool orderPointsX(const cv::Point& a, const cv::Point& b)
 {
@@ -65,16 +78,14 @@ BoardFinder::BoardFinder()
     if(debug_)
     {
         image_transport::ImageTransport it(nh);
-        pub_ = it.advertise("board_finder_image",1);
+        image_pub_ = it.advertise("board_finder_image",1);
+        cloud_pub_ = nh.advertise< pcl::PointCloud<pcl::PointXYZRGB> >("board_finder_cloud", 1);
     }
 }
 
-bool BoardFinder::findCorners(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
-                              pcl::PointCloud<pcl::PointXYZRGB>& points)
+bool BoardFinder::findBoard(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
+                            tf::Transform& board)
 {
-    /* Copy header to preserve frame */
-    points.header = cloud->header;
-
     /* Get an OpenCV image from the cloud 
            TODO: update this code to be better/faster... */
     sensor_msgs::ImagePtr image_msg(new sensor_msgs::Image);
@@ -253,36 +264,55 @@ bool BoardFinder::findCorners(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
 
     ROS_DEBUG_STREAM("Board Finder: Found " << corner_points_2d.size() << " 2d points");
 
-    if(corner_points_2d.size() > point_threshold_)
+    if(corner_points_2d.size() < point_threshold_)
+        return false;
+
+    /* Project to 3d */
+    pcl::PointCloud<pcl::PointXYZRGB> points;
+    for ( size_t i = 0; i < corner_points_2d.size(); i++ )
     {
-        /* Project to 3d */
-        for ( size_t i = 0; i < corner_points_2d.size(); i++ )
+        cv::Point p2d = corner_points_2d[i];
+        pcl::PointXYZRGB p3d = (*cloud)(p2d.x, p2d.y);
+        if( !isnan(p3d.x) && !isnan(p3d.y) && !isnan(p3d.z) )
         {
-            cv::Point p2d = corner_points_2d[i];
-            pcl::PointXYZRGB p3d = (*cloud)(p2d.x, p2d.y);
-            if( !isnan(p3d.x) && !isnan(p3d.y) && !isnan(p3d.z) )
+            if( accept_3d(p3d, points) )
             {
-                if( accept_3d(p3d, points) )
-                {
-                    points.push_back( p3d );
-                }
+                points.push_back( p3d );
             }
-            // TODO: add some means of searching for a point near here that is not a nan.
         }
-
-        ROS_DEBUG_STREAM("Board Finder: Found " << points.size() << " 3d points");
-    
-        if(points.size() < point_threshold_)
-            return false;
-
-        if(debug_)
-        {
-            bridge_->image = cdst;
-            pub_.publish( bridge_->toImageMsg() );
-        }
-        return true;
+        // TODO: add some means of searching for a point near here that is not a nan.
     }
-    return false;
+
+    ROS_DEBUG_STREAM("Board Finder: Found " << points.size() << " 3d points");
+
+    if(points.size() != 49) // point_threshold_)
+        return false;
+
+    if(debug_)
+    {
+        bridge_->image = cdst;
+        image_pub_.publish( bridge_->toImageMsg() );
+        points.header = cloud->header;
+        cloud_pub_.publish(points);
+    }
+
+    /* estimate board/piece pose */
+    pcl::PointCloud<pcl::PointXYZ> ideal;
+    for(int h = 1; h < 8; h++)
+    {
+        for(int v = 1; v < 8; v++)
+        {
+            /* TODO: make this work without exactly the 49 points */
+            ideal.push_back(pcl::PointXYZ(0.05715*v,0.05715*h,0));
+        }
+    }
+
+    Eigen::Matrix4f t;
+    reg_.estimateRigidTransformation(points, ideal, t);
+
+    /* Return board estimate */
+    board = tfFromEigen(t.inverse());
+    return true;
 }
 
 /* Helper function to decide whether to accept a point */
