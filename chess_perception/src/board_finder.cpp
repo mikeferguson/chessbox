@@ -132,6 +132,10 @@ bool BoardFinder::findCorners(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
                 if( (fabs(ba-bb) < 15.0f) && (fabs(ma-mb) < 0.5) )
                 {
                     push = false;
+                    if(abs(dx) > abs(b[2]-b[0]))
+                    {
+                        h_lines[j] = a;
+                    }
                     break;
                 }
             }
@@ -149,6 +153,10 @@ bool BoardFinder::findCorners(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
                 if( (fabs(ba-bb) < 15.0f) && (fabs(ma-mb) < 0.5) )
                 {
                     push = false;
+                    if(abs(dy) > abs(b[3]-b[1]))
+                    {
+                        v_lines[j] = a;
+                    }
                     break;
                 }
             }
