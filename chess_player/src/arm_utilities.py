@@ -18,7 +18,6 @@
   Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 """
 
-import roslib; roslib.load_manifest('chess_player')
 import rospy, actionlib
 from math import sqrt
 import pexpect

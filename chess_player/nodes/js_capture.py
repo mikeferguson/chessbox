@@ -4,9 +4,7 @@
 Capture the arm state.
 """
 
-import roslib; roslib.load_manifest('chess_player')
 import rospy
-
 from sensor_msgs.msg import JointState
 
 servos = ['arm_lift_joint', 'arm_shoulder_pan_joint', 'arm_shoulder_lift_joint', 'arm_elbow_flex_joint', 'arm_wrist_flex_joint', 'arm_wrist_roll_joint']
