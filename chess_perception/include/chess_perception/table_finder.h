@@ -50,6 +50,8 @@ class TableFinder
     bool findTable(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
                    pcl::PointCloud<pcl::PointXYZRGB>& cloud_hull);
 
+    pcl::ModelCoefficients::Ptr getCoefficients() { return coefficients_; }
+
   private:
     bool debug_;
 
@@ -61,6 +63,8 @@ class TableFinder
     pcl::SACSegmentationFromNormals<pcl::PointXYZRGB, pcl::Normal> segmentation_;
     pcl::ProjectInliers<pcl::PointXYZRGB> project_;
     pcl::ConvexHull<pcl::PointXYZRGB> convexhull_;
+
+    pcl::ModelCoefficients::Ptr coefficients_; // (new pcl::ModelCoefficients());
 
     ros::Publisher table_cloud_pub_;
     ros::Publisher hull_cloud_pub_;

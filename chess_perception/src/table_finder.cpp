@@ -75,10 +75,10 @@ bool TableFinder::findTable(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
     
     /* Segment table plane, extract points */
     pcl::PointIndices::Ptr inliers (new pcl::PointIndices());
-    pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients());
+    coefficients_.reset(new pcl::ModelCoefficients());
     segmentation_.setInputNormals(cloud_normals);
     segmentation_.setInputCloud(cloud_downsampled);
-    segmentation_.segment(*inliers, *coefficients);
+    segmentation_.segment(*inliers, *coefficients_);
 
     if(inliers->indices.size() == 0)
     {
@@ -86,14 +86,14 @@ bool TableFinder::findTable(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
         return false;
     }
 
-    ROS_DEBUG_STREAM("Table Finder: Model Coefficients: " << coefficients->values[0] << " "
-                                                         << coefficients->values[1] << " "
-                                                         << coefficients->values[2] << " "
-                                                         << coefficients->values[3]);
+    ROS_DEBUG_STREAM("Table Finder: Model Coefficients: " << coefficients_->values[0] << " "
+                                                          << coefficients_->values[1] << " "
+                                                          << coefficients_->values[2] << " "
+                                                          << coefficients_->values[3]);
     /* Project inliers */
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_projected (new pcl::PointCloud<pcl::PointXYZRGB>);
     project_.setInputCloud(cloud_downsampled);
-    project_.setModelCoefficients(coefficients);
+    project_.setModelCoefficients(coefficients_);
     project_.setIndices(inliers);
     project_.filter(*cloud_projected);
     ROS_DEBUG_STREAM("Table Finder: Projected cloud has " << cloud_projected->size() << " points.");
