@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8.3)
 project(chess_perception)
 
 # setup
-find_package(catkin REQUIRED roscpp cv_bridge image_transport tf)
+find_package(catkin REQUIRED roscpp cv_bridge image_transport tf pcl_ros)
 find_package(Boost REQUIRED system filesystem)
 find_package(PCL REQUIRED)
 find_package(OpenCV REQUIRED)
