@@ -22,6 +22,22 @@ Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 #include <ros/ros.h>
 
+/** Sort points based only on x-component */
+bool orderPointsX(const cv::Point& a, const cv::Point& b)
+{
+    return a.x < b.x;
+}
+
+/** Order horizontal lines (bottom of screen first) */
+bool orderLinesH(const cv::Vec4i& a, const cv::Vec4i& b)
+{
+    double ma = (a[3]-a[1])/(double)(a[2]-a[0]);
+    double mb = (b[3]-b[1])/(double)(b[2]-b[0]);
+    double ba = a[1] - ma*a[0];
+    double bb = b[1] - mb*b[0];
+    return ba > bb;
+}
+
 BoardFinder::BoardFinder()
 {
     /* TODO: load these from parameters */
@@ -56,6 +72,9 @@ BoardFinder::BoardFinder()
 bool BoardFinder::findCorners(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
                               pcl::PointCloud<pcl::PointXYZRGB>& points)
 {
+    /* Copy header to preserve frame */
+    points.header = cloud->header;
+
     /* Get an OpenCV image from the cloud 
            TODO: update this code to be better/faster... */
     sensor_msgs::ImagePtr image_msg(new sensor_msgs::Image);
@@ -96,19 +115,50 @@ bool BoardFinder::findCorners(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
     ROS_DEBUG("Found %d lines", (int) lines.size());
 
     /* Split into vertical/horizontal lines */
-    std::vector<int> h_indexes, v_indexes;
+    std::vector<cv::Vec4i> h_lines, v_lines;
     for( size_t i = 0; i < lines.size(); i++ )
     {
-        cv::Vec4i l = lines[i];
-        if( l[0] < 100 or l[0] > 500) continue;
-        if( l[2] < 100 or l[2] > 500) continue;
-        int dx = l[2]-l[0]; int dy = l[3]-l[1];
+        cv::Vec4i a = lines[i];
+        int dx = a[2]-a[0]; int dy = a[3]-a[1];
         if(abs(dx) > abs(dy)){
-            h_indexes.push_back(i);
+            bool push = true;
+            double ma = (a[3]-a[1])/(double)(a[2]-a[0]);
+            double ba = a[1] - ma*a[0];
+            for( size_t j = 0; j < h_lines.size(); j++)
+            {
+                cv::Vec4i b = h_lines[j];
+                double mb = (b[3]-b[1])/(double)(b[2]-b[0]);
+                double bb = b[1] - mb*b[0];
+                if( (fabs(ba-bb) < 15.0f) && (fabs(ma-mb) < 0.5) )
+                {
+                    push = false;
+                    break;
+                }
+            }
+            if(push)
+                h_lines.push_back(a);
         }else{
-            v_indexes.push_back(i);
+            bool push = true;
+            double ma = (a[2]-a[0])/(double)(a[3]-a[1]); // x = my+b
+            double ba = a[0] - ma*a[1];
+            for( size_t j = 0; j < v_lines.size(); j++)
+            {
+                cv::Vec4i b = v_lines[j];
+                double mb = (b[2]-b[0])/(double)(b[3]-b[1]);
+                double bb = b[0] - mb*b[1];
+                if( (fabs(ba-bb) < 15.0f) && (fabs(ma-mb) < 0.5) )
+                {
+                    push = false;
+                    break;
+                }
+            }
+            if(push)
+                v_lines.push_back(a);
         }
     }
+
+    /* Sort horizontal lines */
+    std::sort(h_lines.begin(), h_lines.end(), orderLinesH);
 
     /* Output lines to screen */
     if(debug_)
@@ -117,65 +167,78 @@ bool BoardFinder::findCorners(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
         cv::cvtColor(src, cdst, CV_GRAY2BGR);
             
         /* Then blue/green for horizontal/vertical */
-        ROS_DEBUG("horizontal lines: %d", (int) h_indexes.size());
-        for( size_t i = 0; i < h_indexes.size(); i++ )
+        ROS_DEBUG("horizontal lines: %d", (int) h_lines.size());
+        for( size_t i = 0; i < h_lines.size(); i++ )
         {
-            cv::Vec4i l = lines[h_indexes[i]];
-            cv::line( cdst, cv::Point(l[0], l[1]), cv::Point(l[2], l[3]), cv::Scalar(0,0,255), 3, CV_AA);
+            cv::Vec4i l = h_lines[i];
+            if(i%2 == 0)
+                cv::line( cdst, cv::Point(l[0], l[1]), cv::Point(l[2], l[3]), cv::Scalar(0,0,255), 2, CV_AA);
+            else
+                cv::line( cdst, cv::Point(l[0], l[1]), cv::Point(l[2], l[3]), cv::Scalar(255,0,255), 2, CV_AA);
         }
-        ROS_DEBUG("vertical lines: %d", (int) v_indexes.size());
-        for( size_t i = 0; i < v_indexes.size(); i++ )
+        ROS_DEBUG("vertical lines: %d", (int) v_lines.size());
+        for( size_t i = 0; i < v_lines.size(); i++ )
         {
-            cv::Vec4i l = lines[v_indexes[i]];
-            cv::line( cdst, cv::Point(l[0], l[1]), cv::Point(l[2], l[3]), cv::Scalar(0,255,0), 3, CV_AA);
+            cv::Vec4i l = v_lines[i];
+            cv::line( cdst, cv::Point(l[0], l[1]), cv::Point(l[2], l[3]), cv::Scalar(0,255,0), 2, CV_AA);
         }
     }
 
     /* Get all (2d) intersections, which are proper corners */ 
     std::vector<cv::Point> corner_points_2d;
-    for( size_t i = 0; i < h_indexes.size(); i++ )
+    for( size_t i = 0; i < h_lines.size(); i++ )
     {
-        cv::Vec4i hl = lines[h_indexes[i]];
-        for( size_t j = 0; j < v_indexes.size(); j++ )
+        cv::Vec4i hl = h_lines[i];
+        std::vector<cv::Point> temp_lines;
+        for( size_t j = 0; j < v_lines.size(); j++ )
         {
             /* For each vertical and horizontal line pair, find the intersection */
-            cv::Vec4i vl = lines[v_indexes[j]];
+            cv::Vec4i vl = v_lines[j];
             cv::Point p = findIntersection(hl,vl);
             /* Test that intersection exists, and is not close to a point already picked */
-            if(p.x > 0 && p.y > 0 && accept(p, corner_points_2d))
+            if(p.x > 0 && p.y > 0)
             {
                 /* Test if this really is a checkerboard intersection by checking
                  * the color of points on four sides.
                  * TODO: this is a mockup, add a real check
                  */
-                if(src.at<unsigned char>(p.y + 10, p.x + 10) < 120)
+                if(src.at<unsigned char>(p.y + 7, p.x + 7) < 120)
                 {
-                    if(src.at<unsigned char>(p.y + 10, p.x - 10) < 120 ||
-                       src.at<unsigned char>(p.y - 10, p.x - 10) > 120 ||
-                       src.at<unsigned char>(p.y - 10, p.x + 10) < 120)
-                    {
-                        if(debug_)
-                            cv::circle( cdst, p, 5, cv::Scalar(255,255,0), -1 );
-                        continue;
-                    }
-                 }
-                else
-                {
-                    if(src.at<unsigned char>(p.y + 10, p.x - 10) > 120 ||
-                       src.at<unsigned char>(p.y - 10, p.x - 10) < 120 ||
-                       src.at<unsigned char>(p.y - 10, p.x + 10) > 120)
+                    if(src.at<unsigned char>(p.y + 7, p.x - 7) < 120 ||
+                       src.at<unsigned char>(p.y - 7, p.x - 7) > 120 ||
+                       src.at<unsigned char>(p.y - 7, p.x + 7) < 120)
                     {
                         if(debug_)
                             cv::circle( cdst, p, 5, cv::Scalar(255,255,0), -1 );
                         continue;
                     }
                 }
-                corner_points_2d.push_back(p);
+                else
+                {
+                    if(src.at<unsigned char>(p.y + 7, p.x - 7) > 120 ||
+                       src.at<unsigned char>(p.y - 7, p.x - 7) < 120 ||
+                       src.at<unsigned char>(p.y - 7, p.x + 7) > 120)
+                    {
+                        if(debug_)
+                            cv::circle( cdst, p, 5, cv::Scalar(255,255,0), -1 );
+                        continue;
+                    }
+                }
+                temp_lines.push_back(p);
                 if(debug_)
                 {
                     /* Draw circles */
                     cv::circle( cdst, p, 5, cv::Scalar(255,0,0), -1 );
+                    //ROS_INFO_STREAM(p.x << "," << p.y);
                 }
+            }
+        }
+        if(temp_lines.size() > 5)
+        {
+            std::stable_sort(temp_lines.begin(), temp_lines.end(), orderPointsX);
+            for(size_t k = 0; k < temp_lines.size(); k++)
+            {
+                corner_points_2d.push_back(temp_lines[k]);
             }
         }
     }
