@@ -24,11 +24,12 @@ import rospy
 from chess_msgs.msg import *
 from std_srvs.srv import *
 
-from tf_utilities import *
-from chess_utilities import *
-from arm_utilities import *
-from sound_utilities import *
-from head_utilities import *
+from tf.listener import *
+
+from chess_player.chess_utilities import *
+from chess_player.arm_utilities import *
+from chess_player.sound_utilities import *
+from chess_player.head_utilities import *
 
 ###############################################################################
 # Executive for managing chess game
@@ -38,24 +39,16 @@ class ChessExecutive:
         """ Start the executive node """
         rospy.init_node("chess_executive")
         self.interactive = False
-        self.listener = SyncListener()
-
-        # connect to camera_turnpike service
-        rospy.loginfo('exec: Waiting for /camera_turnpike/trigger')
-        rospy.wait_for_service('/camera_turnpike/trigger')
-        self.camera_trigger = rospy.ServiceProxy('/camera_turnpike/trigger', Empty)
+        self.listener = TransformListener()
 
         # get arm planner
         rospy.loginfo('exec: Waiting for /simple_arm_server/move')
-        #rospy.wait_for_service('/simple_arm_server/move')
-        #self.planner = ArmPlanner( rospy.ServiceProxy('/simple_arm_server/move', MoveArm), listener = self.listener )
-        #self.planner = actionlib.SimpleActionClient('move_arm', MoveArmAction)
         self.planner = ArmPlanner( listener = self.listener )
 
         # subscribe to input
         self.board = BoardState()
         self.updater = BoardUpdater(self.board, self.listener)
-        rospy.Subscriber('/extract_pieces/output', ChessBoard, self.updater.callback) 
+        rospy.Subscriber('chess_board_state', ChessBoard, self.updater.callback)
 
         # subscribe to your move services
         self.yourMove = self.yourMovePerception
@@ -90,12 +83,6 @@ class ChessExecutive:
 
     def yourMovePerception(self):
         self.speech.say("Your move.")
-
-    def trigger(self):
-        try:
-            self.camera_trigger()
-        except:
-            pass    # let's not crash on exit
 
     ###########################################################################
     # game playing
@@ -165,36 +152,20 @@ class ChessExecutive:
     def updateBoardState(self, acceptNone = False):
         """ Updates board state by triggering pipeline. """
         self.updater.up_to_date = False
-        rospy.loginfo("exec: Triggering...")
-        self.trigger()
-        output_t = rospy.Time.now()
         updated_t = rospy.Time.now()
         while not rospy.is_shutdown():
-            if (rospy.Time.now()-output_t).to_sec() > 5.0:
-                self.board.output = True
-                self.head.wiggle_head()
-                output_t = rospy.Time.now()
             if (rospy.Time.now()-updated_t).to_sec() > 5.0:
-                rospy.logerr("exec: Failed to get updates, triggering again")
-                self.trigger()
+                self.head.wiggle_head()
                 updated_t = rospy.Time.now()
             if self.updater.up_to_date:
-                if self.board.last_move == "fail":
-                    self.updater.up_to_date = False 
-                    rospy.loginfo("exec: Triggering again...")
-                    self.trigger()
-                elif self.board.last_move == "none":
+                if self.board.last_move == "none":
                     if acceptNone:
                         break
                     else:
-                        self.updater.up_to_date = False 
-                        rospy.loginfo("exec: Triggering again...")
-                        self.trigger()
+                        self.updater.up_to_date = False
                 else:
                     if acceptNone:
-                        self.updater.up_to_date = False 
-                        rospy.loginfo("exec: Triggering again...")
-                        self.trigger()
+                        self.updater.up_to_date = False
                     else:
                         break
                 updated_t = rospy.Time.now()

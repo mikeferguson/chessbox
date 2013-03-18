@@ -41,8 +41,6 @@ class ArmPlanner:
     
     def __init__(self, client=None, listener=None):
         if client==None:
-            #rospy.wait_for_service('simple_arm_server/move')
-            #self.move = rospy.ServiceProxy('simple_arm_server/move', MoveArm) 
             self.client = actionlib.SimpleActionClient('move_arm', MoveArmAction)
             self.client.wait_for_server()
         else:
@@ -71,7 +69,7 @@ class ArmPlanner:
         goal.header.frame_id = fr.header.frame_id
 
         # is this a capture?
-        if to != None: 
+        if to != None:
             off_board = ChessPiece()
             off_board.header.frame_id = fr.header.frame_id
             off_board.pose.position.x = -2 * SQUARE_SIZE
@@ -87,10 +85,8 @@ class ArmPlanner:
         
         # execute
         try:
-            #self.success = self.move(req)
-            #print self.success
             self.client.send_goal(goal)
-            self.client.wait_for_result()   
+            self.client.wait_for_result()
             print self.client.get_result()
         except rospy.ServiceException, e:
             print "Service did not process request: %s"%str(e)

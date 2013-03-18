@@ -318,216 +318,149 @@ class BoardState:
                 
 
 
-class BoardUpdater(threading.Thread):
+class BoardUpdater():
 
     def __init__(self, board, listener):
-        threading.Thread.__init__(self)
         self.board = board
         self.listener = listener
-        self.translation = None 
-        self.rotation = None
-        self.up_to_date = True
-        self.start()
-        
+        self.up_to_date = False # meaning has changed, now tells whether message has been recieved
+
     def callback(self, message):
         """ 
         Update the board state, given a new ChessBoard message.
         """
-        rospy.sleep(0.1)
-        self.listener.mutex.acquire()
+        # no need to update if already up to date
+        if self.up_to_date == True:
+            return
+
         piece_gone  = list()    # locations moved from
         piece_new   = list()    # locations moved to
         piece_color = list()    # locations that have changed color
-    
-        # transform pieces
-        pieces_transformed = list()
+
+        # process ChessBoard message
+        temp_board = BoardState(self.board.side)
         for piece in message.pieces:
-            ps = PoseStamped()
-            ps.header.frame_id = piece.header.frame_id
-            ps.pose = piece.pose
-            pose = self.listener.transformPose("chess_board_raw", ps)
-            #print ps, pose
-            piece.pose = pose.pose
-            piece.header.frame_id = "chess_board_raw"
-            #col = self.board.getColName(int(piece.pose.position.x/SQUARE_SIZE))
-            #rank = int(piece.pose.position.y/SQUARE_SIZE) + 1
-            #print col,rank
-        
-        #print message.pieces
+            # get col, rank as "x0"
+            if self.board.side == self.board.WHITE or self.board.side == None:
+                col = self.board.getColName(int(piece.pose.position.x/SQUARE_SIZE))
+                rank = int(piece.pose.position.y/SQUARE_SIZE) + 1
+            else:
+                col = self.board.getColName(7 - int(piece.pose.position.x/SQUARE_SIZE))
+                rank = 8 - int(piece.pose.position.y/SQUARE_SIZE)
+            if not self.board.valid(col, rank):
+                print "invalid: ", col, rank
+                continue
 
-        # iterate through ways board could be inproperly localized
-        for x_off in [0,-1,1]:
-            for y_off in [0,-1,1]:
-                # process ChessBoard message
-                temp_board = BoardState(self.board.side)
-                for piece in message.pieces:
-                    # get col, rank as "x0"
-                    if self.board.side == self.board.WHITE or self.board.side == None:
-                        col = self.board.getColName(int(piece.pose.position.x/SQUARE_SIZE + x_off))
-                        rank = int(piece.pose.position.y/SQUARE_SIZE + y_off) + 1
-                    else:
-                        col = self.board.getColName(7 - int(piece.pose.position.x/SQUARE_SIZE + x_off))
-                        rank = 8 - int(piece.pose.position.y/SQUARE_SIZE + y_off)
-                    if not self.board.valid(col, rank):
-                        print "invalid: ", col, rank
-                        continue
+            # update temp board
+            if temp_board.getPiece(col, rank) == None:
+                p = self.board.getPiece(col, rank)
+                if p == None and not self.board.side == None:
+                    piece_new.append([col, rank, piece])
+                    rospy.logdebug("Piece moved to: %s%s" % (col,str(rank)))
+                temp_board.setPiece(col, rank, piece)
 
-                    # update temp board
-                    if temp_board.getPiece(col, rank) == None:
-                        p = self.board.getPiece(col, rank)
-                        if p == None and not self.board.side == None:
-                            piece_new.append([col, rank, piece]) 
-                            rospy.logdebug("Piece moved to: %s%s" % (col,str(rank)))
-                        temp_board.setPiece(col, rank, piece)
+        # see how board has changed
+        for col in 'abcdefgh':
+            for rank in [1,2,3,4,5,6,7,8]:
+                old = self.board.getPiece(col,rank)
+                new = temp_board.getPiece(col,rank)
+                if new == None and old != None:
+                    # this piece is gone!
+                    piece_gone.append([col, rank, old])
+                    rospy.loginfo("Piece moved from: %s%s" % (col,str(rank)))
+                elif old != None and new != None and new.type/abs(float(new.type)) != old.type/abs(float(old.type)):
+                    # capture!
+                    piece_color.append([col, rank, new])
+                    rospy.logdebug("Piece captured: %s%s" % (col,str(rank)))
+                elif old != None and new != None:
+                    # boring, but update types!
+                    new.type = old.type
+                    temp_board.setPiece(col,rank,new)
 
-                # see how board has changed
-                for col in 'abcdefgh':
-                    for rank in [1,2,3,4,5,6,7,8]:
-                        old = self.board.getPiece(col,rank)
-                        new = temp_board.getPiece(col,rank)                    
-                        if new == None and old != None:
-                            # this piece is gone!
-                            piece_gone.append([col, rank, old])
-                            rospy.loginfo("Piece moved from: %s%s" % (col,str(rank)))
-                        elif old != None and new != None and new.type/abs(float(new.type)) != old.type/abs(float(old.type)):
-                            # capture!
-                            piece_color.append([col, rank, new])
-                            rospy.logdebug("Piece captured: %s%s" % (col,str(rank))) 
-                        elif old != None and new != None:
-                            # boring, but update types!
-                            new.type = old.type
-                            temp_board.setPiece(col,rank,new)
+        # plausibility test: there can only be one change or new piece
+        if self.board.side == None:
+            temp_board.printBoard()
+            if len(piece_color) + len(piece_new) == 0 and len(piece_gone) == 0:
+                rospy.loginfo("No side set, but we are probably white.")
+                self.board.last_move = "none"
+                return self.setBoard(temp_board)
 
-                # plausibility test: there can only be one change or new piece
-                if self.board.side == None:
-                    temp_board.printBoard()
-                    if len(piece_color) + len(piece_new) == 0 and len(piece_gone) == 0:
-                        rospy.loginfo("No side set, but we are probably white.")
-                        self.board.last_move = "none"
-                        return self.setWithOffset(x_off, y_off, temp_board)
+            elif len(piece_color) >= 32 and len(piece_new) == 0:
+                rospy.loginfo("No side set, but we are probably black.")
+                self.board.last_move = "none"
+                return self.setBoard(temp_board)
 
-                    elif len(piece_color) >= 32 and len(piece_new) == 0:
-                        rospy.loginfo("No side set, but we are probably black.")
-                        self.board.last_move = "none"
-                        return self.setWithOffset(x_off, y_off, temp_board)
+            else:
+                rospy.logdebug("Try again, %d" % (len(piece_new) + len(piece_color)))
+                self.board.last_move = "fail"
+                return
 
-                    else:
-                        rospy.logdebug("Try again, %d" % (len(piece_new) + len(piece_color)))        
-                        self.board.last_move = "fail"
-                        self.up_to_date = True
-                        self.listener.mutex.release()
-                        return
+        elif len(piece_new) + len(piece_color) != 1:
+            # castling
+            self.board.castling_move = self.board.isCastling(piece_new, piece_color, piece_gone)
+            if self.board.castling_move != None:
+                # castling
+                rospy.loginfo("Castling, %s" % self.board.castling_move)
 
-                elif len(piece_new) + len(piece_color) != 1:
-                    # castling
-                    self.board.castling_move = self.board.isCastling(piece_new, piece_color, piece_gone)
-                    if self.board.castling_move != None:
-                        # castling
-                        rospy.loginfo("Castling, %s" % self.board.castling_move)
+                m = self.board.castling_move
+                print m
+                #self.copyType(m[0], m[1], m[2], m[3], temp_board)
+                to = ChessPiece()
+                to.type = self.board.side * ChessPiece.BLACK_KING
+                temp_board.setPiece(m[2],int(m[3]),to)
 
-                        m = self.board.castling_move
-                        print m
-                        #self.copyType(m[0], m[1], m[2], m[3], temp_board)
-                        to = ChessPiece()
-                        to.type = self.board.side * ChessPiece.BLACK_KING
-                        temp_board.setPiece(m[2],int(m[3]),to)
+                m = castling_extras[m]
+                print m
+                #self.copyType(m[0], m[1], m[2], m[3], temp_board)
+                to = ChessPiece()
+                to.type = self.board.side * ChessPiece.BLACK_ROOK
+                temp_board.setPiece(m[2],int(m[3]),to)
+                self.board.previous = [self.board.values, self.board.last_move]
+                self.board.last_move = self.board.castling_move
+                return self.setBoard(temp_board)
 
-                        m = castling_extras[m]
-                        print m
-                        #self.copyType(m[0], m[1], m[2], m[3], temp_board)
-                        to = ChessPiece()
-                        to.type = self.board.side * ChessPiece.BLACK_ROOK
-                        temp_board.setPiece(m[2],int(m[3]),to)
-                        self.board.previous = [self.board.values, self.board.last_move] 
-                        self.board.last_move = self.board.castling_move
-                        return self.setWithOffset(x_off, y_off, temp_board)
+            rospy.logdebug("Try again, %d" % (len(piece_new) + len(piece_color)))
+            self.board.last_move = "fail"
+            return
 
-                    rospy.logdebug("Try again, %d" % (len(piece_new) + len(piece_color))) 
-                    self.board.last_move = "fail"
-                    self.up_to_date = True
-                    self.listener.mutex.release()
-                    return
+        # if our pieces are missing, fill them in (bishops!)
+        candidates = list()
+        for entry in piece_gone:
+            (col, rank, piece) = entry
+            if piece.type/abs(piece.type) == self.board.side:
+                # fill in
+                temp_board.setPiece(col, rank, self.board.getPiece(col,rank))
+            else:
+                candidates.append(entry)
+        if len(candidates) == 0:
+            rospy.loginfo("Try again, no candidates")
+            self.board.last_move = "fail"
+            return
+        if len(candidates) > 1: # too many possibilities (added 3AM on Wednesday!)
+            rospy.loginfo("Try again, too many candidates %d" % len(candidates))
+            self.board.last_move = "fail"
+            return
 
-                # if our pieces are missing, fill them in (bishops!)
-                candidates = list()
-                for entry in piece_gone:
-                    (col, rank, piece) = entry
-                    if piece.type/abs(piece.type) == self.board.side:
-                        # fill in
-                        temp_board.setPiece(col, rank, self.board.getPiece(col,rank))
-                    else:
-                        candidates.append(entry)
-                if len(candidates) == 0:
-                    rospy.loginfo("Try again, no candidates")        
-                    self.board.last_move = "fail"
-                    self.up_to_date = True
-                    self.listener.mutex.release()
-                    return
-                if len(candidates) > 1: # too many possibilities (added 3AM on Wednesday!)
-                    rospy.loginfo("Try again, too many candidates %d" % len(candidates))        
-                    self.board.last_move = "fail"
-                    self.up_to_date = True
-                    self.listener.mutex.release()
-                    return
-        
-                # find the corresponding piece
-                if len(piece_new) == 1:
-                    piece_to = piece_new[0]
-                else:
-                    piece_to = piece_color[0]
-                piece_fr = candidates[0]
-                # update type
-                self.board.copyType(piece_fr[0], piece_fr[1], piece_to[0], piece_to[1], temp_board)
-               
-                # set outputs
-                self.board.previous = [self.board.values, self.board.last_move] 
-                self.board.last_move = piece_fr[0] + str(piece_fr[1]) + piece_to[0] + str(piece_to[1])
-                return self.setWithOffset(x_off,y_off,temp_board)
+        # find the corresponding piece
+        if len(piece_new) == 1:
+            piece_to = piece_new[0]
+        else:
+            piece_to = piece_color[0]
+        piece_fr = candidates[0]
+        # update type
+        self.board.copyType(piece_fr[0], piece_fr[1], piece_to[0], piece_to[1], temp_board)
 
+        # set outputs
+        self.board.previous = [self.board.values, self.board.last_move]
+        self.board.last_move = piece_fr[0] + str(piece_fr[1]) + piece_to[0] + str(piece_to[1])
+        return self.setBoard(temp_board)
 
-    def setWithOffset(self, x, y, temp_board):        
+    def setBoard(self, temp_board):
         # patch board
         self.board.values = temp_board.values
-        for piece in self.board.values:
-            if piece != None:
-                piece.pose.position.x += x*SQUARE_SIZE
-                piece.pose.position.y += y*SQUARE_SIZE
-                piece.header.frame_id = "chess_board"
-
-        # look up board location
-        try: 
-            (translation, rotation) = self.listener.lookupTransform('odom', 'chess_board_raw', rospy.Time(0))
-        except:
-            rospy.logerr("Failed to transform")
-            return
-        ps = PoseStamped()
-        ps.header.frame_id = "chess_board_raw"
-        ps.pose.position.x = x*SQUARE_SIZE
-        ps.pose.position.y = y*SQUARE_SIZE
-        pose = self.listener.transformPose("odom", ps)
-        self.translation = (pose.pose.position.x, pose.pose.position.y, pose.pose.position.z)
-        self.rotation = rotation
-
-        if True: #self.board.output: 
-            temp_board.printBoard()
-            #self.board.output = False
-
-        self.listener.mutex.release()
+        #if self.board.output:
+        #    temp_board.printBoard()
         self.up_to_date = True
-        return
-
-    def run(self):
-        br = tf.TransformBroadcaster()
-        while not rospy.is_shutdown():
-            if self.translation != None:
-                br.sendTransform( self.translation,
-                                  self.rotation,
-                                  rospy.Time.now(),
-                                  "chess_board",
-                                  "odom" )   
-
-            rospy.sleep(0.1)        
-
 
 ###########################################################
 # chess engine logic

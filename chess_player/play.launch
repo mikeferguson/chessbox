@@ -3,7 +3,6 @@
 
   <!-- also run maxwell_defs bringup.launch -->
   <include file="$(find maxwell_defs)/launch/head_camera.launch" />
-  <include file="$(find chess_player)/launch/simple_arm_server.launch" />
 
   <node pkg="chess_perception" type="chess_perception" name="chess_perception_node" respawn="true"/>
 
