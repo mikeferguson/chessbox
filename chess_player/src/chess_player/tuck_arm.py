@@ -26,11 +26,11 @@ import sys
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from control_msgs.msg import *
 
-servos = ['arm_lift_joint', 'arm_shoulder_pan_joint', 'arm_shoulder_lift_joint', 'arm_elbow_flex_joint', 'arm_wrist_flex_joint', 'arm_wrist_roll_joint']
+servos = ['arm_lift_joint', 'arm_shoulder_pan_joint', 'arm_upperarm_roll_joint', 'arm_shoulder_lift_joint', 'arm_elbow_flex_joint', 'arm_wrist_flex_joint', 'arm_wrist_roll_joint']
 
-forward = [0.0, -0.0409061543436171, -1.5550862978955564, 1.4817828305200882, 1.6515859816235403, -0.066472500808377785]
-to_side = [0.0, 1.4675082870772636, -1.545498917971271, 1.4817828305200882, 1.6157930965728755, -0.066472500808377785]
-tucked = [0.0, 1.4675082870772636, -2.055760582830453, 1.4817828305200882, 1.7180584824319183, -0.066472500808377785]
+forward = [0.0, 0.0, 0.0, -1.5550862978955564, 1.4817828305200882, 1.6515859816235403, -0.066472500808377785]
+to_side = [0.0, -1.57, 0.0, -1.545498917971271, 1.4817828305200882, 1.6157930965728755, -0.066472500808377785]
+tucked  = [0.0, -1.57, 0.0, -1.7, 1.7, 1.6157930965728755, -0.066472500808377785]
 
 class tuck_arm:
     
