@@ -18,9 +18,11 @@
   Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 """
 
-from __future__ import print_function
+#from __future__ import print_function
 
 import rospy
+import actionlib
+
 from tf.listener import *
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
@@ -34,13 +36,17 @@ from moveit_msgs.msg import *
 
 from chess_utilities import SQUARE_SIZE, castling_extras
 
+# tucked position
+servos = ['arm_lift_joint', 'arm_shoulder_pan_joint', 'arm_upperarm_roll_joint', 'arm_shoulder_lift_joint', 'arm_elbow_flex_joint', 'arm_wrist_flex_joint', 'arm_wrist_roll_joint']
+tucked  = [0.0, -1.57, 0.0, -1.7, 1.7, 1.6157930965728755, -0.066472500808377785]
+
+# gripper
 GRIPPER_OPEN = 0.05
 GRIPPER_CLOSE = 0.0075
 
 class ChessMoveIt:
     fixed_frame = "base_link"
     board_frame = "base_link" #"chess_board"
-    
 
     def __init__(self):
         self.listener = TransformListener()
@@ -49,6 +55,57 @@ class ChessMoveIt:
 
         self.moveit = actionlib.SimpleActionClient('move_group', MoveGroupAction)
         self.moveit.wait_for_server()
+
+    # build each trajectory
+    # execute once all trajectories are known
+
+    def execute(self, move, board, nested=False):
+        """ Execute a move. """
+
+        # untuck arm
+        #self.tuck_server.untuck()
+        #rospy.sleep(3.0)
+
+        # get info about move
+        (col_f, rank_f) = board.toPosition(move[0:2])
+        (col_t, rank_t) = board.toPosition(move[2:])
+        fr = board.getPiece(col_f, rank_f)
+        to = board.getPiece(col_t, rank_t)
+
+        goal = MoveArmGoal()
+        goal.header.frame_id = fr.header.frame_id
+
+        # is this a capture?
+        if to != None:
+            off_board = ChessPiece()
+            off_board.header.frame_id = fr.header.frame_id
+            off_board.pose.position.x = -2 * SQUARE_SIZE
+            off_board.pose.position.y = SQUARE_SIZE
+            off_board.pose.position.z = fr.pose.position.z
+            self.addTransit(goal, to.pose, off_board.pose)
+
+        to = ChessPiece()
+        to.header.frame_id = fr.header.frame_id
+        to.pose = self.getPose(col_t, rank_t, board, fr.pose.position.z)
+
+        self.addTransit(goal, fr.pose, to.pose)
+
+        # execute
+        try:
+            self.client.send_goal(goal)
+            self.client.wait_for_result()
+            print self.client.get_result()
+        except rospy.ServiceException, e:
+            print "Service did not process request: %s"%str(e)
+
+        if move in castling_extras:
+            self.execute(castling_extras[move],board)
+
+        if not nested:
+            # tuck arm
+            self.tuck_server.tuck()
+            rospy.sleep(5.0)
+        return to.pose
 
     def addChessboardObject(self):
         o = CollisionObject()
@@ -86,11 +143,63 @@ class ChessMoveIt:
         rospy.sleep(3.0)
         self.object_publisher.publish(o)
 
+    def constructMotionPlanRequestFromJointStates(self, joints, positions):
+        m = MoveGroupGoal()
+
+        # 1. fill in workspace_parameters
+        # 2. fill in start_state
+        # 3. fill in goal_constraints
+        c1 = Constraints()
+
+        c1.position_constraints.append(PositionConstraint())
+        c1.position_constraints[0].header.frame_id = self.fixed_frame
+        c1.position_constraints[0].link_name = "gripper_link"
+        b = BoundingVolume()
+        s = SolidPrimitive()
+        s.dimensions = [0.0001]
+        s.type = s.SPHERE
+        b.primitives.append(s)
+        b.primitive_poses.append(goal_transformed.pose)
+        c1.position_constraints[0].constraint_region = b
+        c1.position_constraints[0].weight = 1.0
+
+        c1.orientation_constraints.append(OrientationConstraint())
+        c1.orientation_constraints[0].header.frame_id = self.fixed_frame
+        c1.orientation_constraints[0].orientation = goal_transformed.pose.orientation
+        c1.orientation_constraints[0].link_name = "gripper_link"
+        c1.orientation_constraints[0].absolute_x_axis_tolerance = 1.0
+        c1.orientation_constraints[0].absolute_y_axis_tolerance = 1.0
+        c1.orientation_constraints[0].absolute_z_axis_tolerance = 0.5
+        c1.orientation_constraints[0].weight = 1.0
+
+        m.request.goal_constraints.append(c1)
+
+        # 4. fill in path constraints
+        # 5. fill in trajectory constraints
+        # 6. fill in planner id
+        # 7. fill in group name
+        m.request.group_name = 'Arm'
+        # 8. fill in number of planning attempts
+        m.request.num_planning_attempts = 1
+        # 9. fill in allowed planning time
+        m.request.allowed_planning_time = 15.0
+
+        # TODO: fill in
+        # m.planning_options.planning_scene_diff.allowed_collision_matrix
+
+        m.planning_options.plan_only = True #False
+        m.planning_options.look_around = False
+        m.planning_options.replan = False
+        return m
+
+
+
     # goal is PoseStamped
     def constructMotionPlanRequest(self, goal_stamped):
+        m = MoveGroupGoal()
+
         goal_transformed = self.listener.transformPose(self.fixed_frame, goal_stamped)
         print(goal_transformed)
-        m = MoveGroupGoal()
 
         # 1. fill in workspace_parameters
         # 2. fill in start_state
@@ -167,7 +276,7 @@ if __name__ == "__main__":
             try:
                 cmit.moveit.send_goal(req)
                 cmit.moveit.wait_for_result()
-                #print(cmit.moveit.get_result())
+                print(cmit.moveit.get_result())
             except rospy.ServiceException, e:
                print("Service did not process request: %s"%str(e))
 
