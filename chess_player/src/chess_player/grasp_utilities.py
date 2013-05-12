@@ -34,6 +34,8 @@ from moveit_msgs.msg import PickupAction, PickupGoal, PlaceAction, PlaceGoal
 from moveit_msgs.msg import AttachedCollisionObject, CollisionObject, PlanningScene
 from manipulation_msgs.msg import Grasp, GripperTranslation, PlaceLocation
 
+from chess_utilities import SQUARE_SIZE
+
 # The frame used for approach and retreat translations, gripper_link is local
 #   so approach/translation gets transformed by the grasp orientation
 TRANSLATION_FRAME = 'gripper_link'
@@ -284,8 +286,8 @@ if __name__=='__main__':
     p = PoseStamped()
     p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
     p.header.frame_id = 'chess_board'
-    p.pose.position.x = 0.05715 * 4 #.15 #0.05715*(0.5+2)
-    p.pose.position.y = 0.05715 * 4 #.20 #0.05715*(0.5)
+    p.pose.position.x = SQUARE_SIZE * 4 #.15 #0.05715*(0.5+2)
+    p.pose.position.y = SQUARE_SIZE * 4 #.20 #0.05715*(0.5)
     p.pose.position.z = -0.05 #-0.3 #0.05
     q = quaternion_from_euler(0.0, 0, 0)
     p.pose.orientation.x = q[0]
@@ -300,25 +302,22 @@ if __name__=='__main__':
     for y in [0,1,6,7]:
         for x in range(8):
             p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
-            p.pose.position.x = 0.05715*(0.5+x)
-            p.pose.position.y = 0.05715*(0.5+y)
+            p.pose.position.x = SQUARE_SIZE*(0.5+x)
+            p.pose.position.y = SQUARE_SIZE*(0.5+y)
             p.pose.position.z = 0.03
             p_transformed = listener.transformPose('base_link', p)
             obj.addCube(chr(97+x)+str(y+1), 0.015, p_transformed.pose.position.x, p_transformed.pose.position.y, p_transformed.pose.position.z)
 
     p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
-    p.pose.position.x = 0.05715 * (0.5 + 4)
-    p.pose.position.y = 0.05715 * (0.5 + 1)
+    p.pose.position.x = SQUARE_SIZE * (0.5 + 4)
+    p.pose.position.y = SQUARE_SIZE * (0.5 + 1)
     p_transformed = listener.transformPose('base_link', p)
 
     pick.pickup('e2', p_transformed)
     rospy.sleep(1.0)
 
-    p_transformed.pose.position.x += 0.05715*2
+    p_transformed.pose.position.x += SQUARE_SIZE*2
     #p_transformed.pose.position.x -= 0.025
     #p_transformed.pose.position.z += 0.1
     place.place('e2', p_transformed)
-
-
-
     
