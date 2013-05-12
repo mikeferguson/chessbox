@@ -23,6 +23,7 @@ from __future__ import print_function
 import thread, copy, math
 import rospy
 import actionlib
+from math import sqrt
 
 from tf.listener import *
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
@@ -35,7 +36,7 @@ from moveit_msgs.msg import Constraints, JointConstraint, PositionConstraint, Or
 from moveit_msgs.msg import AttachedCollisionObject, CollisionObject, PlanningScene
 from manipulation_msgs.msg import Grasp, GripperTranslation, PlaceLocation
 
-from chess_utilities import SQUARE_SIZE #castling_extras
+from chess_utilities import SQUARE_SIZE, castling_extras
 
 # The frame used for approach and retreat translations, gripper_link is local
 #   so approach/translation gets transformed by the grasp orientation
@@ -380,6 +381,124 @@ class ObjectManager:
         l = copy.deepcopy(self._attached)
         self._mutex.release()
         return l
+
+class ArmPlaner:
+    _group = 'Arm'
+    _gripper_group = 'Gripper'
+
+    BOARD_THICKNESS = 0.1
+    CHESS_BOARD_FRAME = 'chess_board'
+
+    """ Chess-specific stuff """
+    def __init__(self, listener = None):
+        self._pick = PickupManager(self._group, self._gripper_group)
+        self._place = PlaceManager(self._group, self._gripper_group)
+        self._obj = ObjectManager(FIXED_FRAME)
+        self._listener = listener
+        if self._listener == None:
+            self._listener = TransformListener()
+        self._move = MotionManager(self._group, FIXED_FRAME, self._listener)
+
+    def move_piece(self, start_pose, end_pose):
+        # update table
+        rospy.loginfo('Updating table position')
+        self._obj.remove('table')
+        p = PoseStamped()
+        # back date header.stamp as perception can be slow
+        p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
+        p.header.frame_id = self.CHESS_BOARD_FRAME
+        p.pose.position.x = SQUARE_SIZE * 4
+        p.pose.position.y = SQUARE_SIZE * 4
+        p.pose.position.z = -self.BOARD_THICKNESS/2.0
+        p.pose.orientation.x = p.pose.orientation.y = p.pose.orientation.z = 0.0
+        p.pose.orientation.w = 1.0
+        pt = self._listener.transformPose(FIXED_FRAME, p)
+        self._obj.addBox('table', SQUARE_SIZE * 8, SQUARE_SIZE * 8, self.BOARD_THICKNESS,
+                         pt.pose.position.x, pt.pose.position.y, pt.pose.position.z)
+        # remove piece for good measure
+        rospy.loginfo('Updating piece position')
+        self._obj.remove('piece')
+        # insert piece
+        p.pose.position.x = start_pose.position.x
+        p.pose.position.y = start_pose.position.y
+        p.pose.position.z = 0.03
+        pt = self._listener.transformPose(FIXED_FRAME, p)
+        self._obj.addCube('piece', 0.015, pt.pose.position.x, pt.pose.position.y, pt.pose.position.z)
+        # pick it up
+        rospy.loginfo('Picking piece')
+        self._pick.pickup('piece', pt)
+        rospy.sleep(1.0)
+        # put it down
+        rospy.loginfo('Placing piece')
+        p.pose.position.x = end_pose.position.x
+        p.pose.position.y = end_pose.position.y
+        p.pose.position.z = 0.03
+        pt = self._listener.transformPose(FIXED_FRAME, p)
+        self._place.place('piece', pt)
+
+    def execute(self, move, board):
+        """ Execute a move. """
+
+        # get info about move
+        (col_f, rank_f) = board.toPosition(move[0:2])
+        (col_t, rank_t) = board.toPosition(move[2:])
+        fr = board.getPiece(col_f, rank_f)
+        to = board.getPiece(col_t, rank_t)
+
+        # is this a capture?
+        if to != None:
+            off_board = ChessPiece()
+            off_board.header.frame_id = fr.header.frame_id
+            off_board.pose.position.x = -2 * SQUARE_SIZE
+            off_board.pose.position.y = SQUARE_SIZE
+            off_board.pose.position.z = fr.pose.position.z
+            if not self.move_piece(to.pose, off_board.pose):
+                rospy.logerror('Failed to move captured piece')
+                self.tuck()
+                return None
+
+        to = ChessPiece()
+        to.header.frame_id = fr.header.frame_id
+        to.pose = self.getPose(col_t, rank_t, board, fr.pose.position.z)
+        if not self.move_piece(fr.pose, to.pose):
+            rospy.logerror('Failed to move my piece')
+            self.tuck()
+            return None
+
+        if move in castling_extras:
+            if not self.execute(castling_extras[move],board):
+                rospy.logerror('Failed to carry out castling extra')
+
+        self.tuck()
+        return to.pose
+
+    def getPose(self, col, rank, board, z=0):
+        """ Find the reach required to get to a position """
+        p = Pose()
+        if board.side == board.WHITE:
+            p.position.x = (col * SQUARE_SIZE) + SQUARE_SIZE/2
+            p.position.y = ((rank-1) * SQUARE_SIZE) + SQUARE_SIZE/2
+            p.position.z = z
+        else:
+            p.position.x = ((7-col) * SQUARE_SIZE) + SQUARE_SIZE/2
+            p.position.y = ((8-rank) * SQUARE_SIZE) + SQUARE_SIZE/2
+            p.position.z = z
+        return p
+
+    # TODO: can we kill this?
+    def getReach(self, col, rank, board):
+        """ Find the reach required to get to a position """
+        ps = PoseStamped()
+        ps.header.frame_id = self.CHESS_BOARD_FRAME
+        ps.pose = self.getPose(board.getColIdx(col), int(rank), board)
+        pose = self._listener.transformPose('arm_link', ps)
+        x = pose.pose.position.x
+        y = pose.pose.position.y
+        reach = sqrt( (x*x) + (y*y) )
+        return reach
+
+    def tuck(self):
+        self._move.moveToJointPosition(joint_names, joints_tucked)
 
 if __name__=='__main__':
     rospy.init_node('grasp_utilities')
