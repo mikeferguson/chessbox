@@ -20,6 +20,7 @@
 
 from __future__ import print_function
 
+import thread, copy
 import rospy
 import actionlib
 
@@ -29,7 +30,8 @@ from tf.transformations import euler_from_quaternion, quaternion_from_euler
 from sensor_msgs.msg import JointState
 from geometry_msgs.msg import PoseStamped
 from shape_msgs.msg import SolidPrimitive
-from moveit_msgs.msg import PickupAction, PickupGoal, PlaceAction, PlaceGoal, CollisionObject
+from moveit_msgs.msg import PickupAction, PickupGoal, PlaceAction, PlaceGoal
+from moveit_msgs.msg import AttachedCollisionObject, CollisionObject, PlanningScene
 from manipulation_msgs.msg import Grasp, GripperTranslation, PlaceLocation
 
 TRANSLATION_FRAME = 'arm_wrist_roll_link'
@@ -101,7 +103,7 @@ class PickupManager(GraspManager):
         g.planning_options.plan_only = False
         self.action.send_goal(g)
         self.action.wait_for_result()
-        print(self.action.get_result())
+        print(self.action.get_result().error_code.val)
 
 class PlaceManager(GraspManager):
     def __init__(self, group, ee):
@@ -123,18 +125,27 @@ class PlaceManager(GraspManager):
         g.planning_options.plan_only = False
         self.action.send_goal(g)
         self.action.wait_for_result()
-        print(self.action.get_result())
+        print(self.action.get_result().error_code.val)
         
 
 class ObjectManager:
-    def __init__(self, frame):        
-        self.pub = rospy.Publisher('collision_object', CollisionObject)
-        self.fixed_frame = frame
+    def __init__(self, frame):
+        self._fixed_frame = frame
+
+        # publisher to send objects
+        self._pub = rospy.Publisher('collision_object', CollisionObject)
+        self._attached_pub = rospy.Publisher('attached_collision_object', AttachedCollisionObject)
+
+        # subscribe to planning scene, track the attached and collision objects
+        self._mutex = thread.allocate_lock()
+        self._attached = list()
+        self._collision = list()
+        rospy.Subscriber('move_group/monitored_planning_scene', PlanningScene, self.sceneCb)
 
     def addCube(self, name, size, x, y, z):
         o = CollisionObject()
         o.header.stamp = rospy.Time.now()
-        o.header.frame_id = self.fixed_frame
+        o.header.frame_id = self._fixed_frame
         o.id = name
 
         s = SolidPrimitive()
@@ -143,7 +154,7 @@ class ObjectManager:
         o.primitives.append(s)
 
         ps = PoseStamped()
-        ps.header.frame_id = self.fixed_frame
+        ps.header.frame_id = self._fixed_frame
         ps.pose.position.x = x
         ps.pose.position.y = y
         ps.pose.position.z = z
@@ -151,15 +162,57 @@ class ObjectManager:
         o.primitive_poses.append(ps.pose)
 
         o.operation = o.ADD
-        self.pub.publish(o)
 
-    def remove(self, name):        
+        self._pub.publish(o)
+        while not name in self.getKnownCollisionObjects():
+            rospy.logdebug('Waiting for object to add')
+            self._pub.publish(o)
+            rospy.sleep(1.0)
+
+    def remove(self, name):
+        """ Remove a an object. """
         o = CollisionObject()
         o.header.stamp = rospy.Time.now()
-        o.header.frame_id = self.fixed_frame
+        o.header.frame_id = self._fixed_frame
         o.id = name
         o.operation = o.REMOVE
-        self.pub.publish(o)
+
+        self._pub.publish(o)
+        while name in self.getKnownCollisionObjects():
+            rospy.logdebug('Waiting for object to remove')
+            self._pub.publish(o)
+            rospy.sleep(1.0)
+
+    def sceneCb(self, msg):
+        """ Recieve updates from move_group. """
+        self._mutex.acquire()
+        for obj in msg.world.collision_objects:
+            try:
+                if obj.operation == obj.ADD:
+                    self._collision.append(obj.id)
+                    rospy.logdebug('ObjectManager: Added Collision Object "%s"' % obj.id)
+                elif obj.operation == obj.REMOVE:
+                    self._collision.remove(obj.id)
+                    rospy.logdebug('ObjectManager: Removed Collision Object "%s"' % obj.id)
+            except ValueError:
+                pass
+        self._attached = list()
+        for obj in msg.robot_state.attached_collision_objects:
+            rospy.logdebug('ObjectManager: attached collision objects includes "%s"' % obj.object.id)
+            self._attached.append(obj.object.id)
+        self._mutex.release()
+
+    def getKnownCollisionObjects(self):
+        self._mutex.acquire()
+        l = copy.deepcopy(self._collision)
+        self._mutex.release()
+        return l
+
+    def getKnownAttachedObjects(self):
+        self._mutex.acquire()
+        l = copy.deepcopy(self._attached)
+        self._mutex.release()
+        return l
 
 
 if __name__=='__main__':
@@ -171,7 +224,7 @@ if __name__=='__main__':
     rospy.sleep(3.0)
 
     obj.remove('part')
-    rospy.sleep(1.0)
+    print('Removed part')
 
     p = PoseStamped()
     p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
@@ -187,14 +240,14 @@ if __name__=='__main__':
     p_transformed = listener.transformPose('base_link', p)
 
     obj.addCube('part', 0.01, p_transformed.pose.position.x, p_transformed.pose.position.y, p_transformed.pose.position.z)
-    rospy.sleep(1.0)
+    print('Added part')
 
     g = pick.get_grasps(p_transformed)
     pick.pickup('part', g)
     rospy.sleep(1.0)
 
-    #p_transformed.pose.position.y += 0.025
-    p_transformed.pose.position.x -= 0.025
+    p_transformed.pose.position.y += 0.05
+    #p_transformed.pose.position.x -= 0.025
     #p_transformed.pose.position.z += 0.1
     l = place.get_place_locations(p_transformed)
     place.place('part', l)
