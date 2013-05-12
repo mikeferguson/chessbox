@@ -14,9 +14,13 @@ This is the n-th generation chess code, which was originally developed for AAAI 
     cd ..
     catkin_make
 
-### Setup for festival
+## Setup for festival
 
     cd /usr/share/festival/voices/english
     sudo wget -c http://www.speech.cs.cmu.edu/cmu_arctic/packed/cmu_us_awb_arctic-0.95-release.tar.bz2
     sudo tar jxf cmu_us_awb_arctic-0.95-release.tar.bz2 
     sudo ln -s cmu_us_awb_arctic cmu_us_awb_arctic_clunits
+
+## Faking Board Detection
+
+    rosrun tf static_transform_publisher .15 .2286 .7366 -1.57 0 0 base_link chess_board 20 
