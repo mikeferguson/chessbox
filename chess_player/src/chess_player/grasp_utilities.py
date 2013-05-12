@@ -20,7 +20,7 @@
 
 from __future__ import print_function
 
-import thread, copy
+import thread, copy, math
 import rospy
 import actionlib
 
@@ -36,97 +36,131 @@ from manipulation_msgs.msg import Grasp, GripperTranslation, PlaceLocation
 
 TRANSLATION_FRAME = 'arm_wrist_roll_link'
 
-class GraspManager:
+def get_gripper_posture(pose):
+    """ This is Maxwell-specific. """
+    js = JointState()
+    js.name = ['l_gripper_joint', 'r_gripper_joint']
+    js.position = [pose, pose]
+    js.velocity = [0.0, 0.0]
+    js.effort = [1.0, 1.0]
+    return js
+
+def get_gripper_translation(min_dist, desired, axis=1.0):
+    gt = GripperTranslation()
+    gt.direction.vector.x = axis
+    gt.direction.header.frame_id = TRANSLATION_FRAME
+    gt.min_distance = min_dist
+    gt.desired_distance = desired
+    return gt
+
+def get_grasps(pose_stamped):
+    """ Returns an iterator of increasingly worse grasps. """
+    g = Grasp()
+    # directly overhead first
+    g.id = 'direct_overhead'
+    g.pre_grasp_posture = get_gripper_posture(0.05)
+    g.grasp_posture = get_gripper_posture(0.01) # was 0.0075
+    g.grasp_pose = pose_stamped
+    g.grasp_quality = 1.0
+    g.approach = get_gripper_translation(0.05, 0.15)
+    g.retreat = get_gripper_translation(0.05, 0.15, -1.0)
+    #g.max_contact_force
+    #g.allowed_touch_objects[]
+    yield g
+    # now tilt the hand a bit, and rotate about yaw
+    for p in [0.05, 0.1, 0.2]:
+        for y in [0.0, 0.78, 1.57, 2.35]:
+            q = quaternion_from_euler(p, y, 0)
+            g.grasp_pose.pose.orientation.x = q[0]
+            g.grasp_pose.pose.orientation.y = q[1]
+            g.grasp_pose.pose.orientation.z = q[2]
+            g.grasp_pose.pose.orientation.w = q[3]
+            g.id = str(p) + '+' + str(y)
+            g.grasp_quality = 1.0 - p - y/4.0
+            yield g
+
+def get_place_locations(pose_stamped):
+    """ Returns an iterator of increasingly worse place locations. """
+    l = PlaceLocation()
+    # directly overhead first
+    l.id = 'direct_overhead'
+    l.place_pose = pose_stamped
+    l.approach = get_gripper_translation(0.05, 0.15)
+    l.retreat = get_gripper_translation(0.05, 0.15, -1.0)
+    l.post_place_posture = get_gripper_posture(0.05)
+    yield l
+    # now tilt the hand a bit, and rotate about yaw
+    for p in [0.05, 0.1, 0.2]:
+        for y in [0.0, 0.78, 1.57, 2.35]:
+            q = quaternion_from_euler(p, y, 0)
+            l.place_pose.pose.orientation.x = q[0]
+            l.place_pose.pose.orientation.y = q[1]
+            l.place_pose.pose.orientation.z = q[2]
+            l.place_pose.pose.orientation.w = q[3]
+            l.id = str(p) + '+' + str(y)
+            yield l
+
+class PickupManager:
     def __init__(self, group, ee):
         self.group = group
         self.effector = ee
-
-    def get_grasps(self, pose_stamped):
-        g = Grasp()
-        g.id = 'name'
-        g.pre_grasp_posture = self.get_gripper_posture(0.05)
-        g.grasp_posture = self.get_gripper_posture(0.01) # was 0.0075
-        g.grasp_pose = pose_stamped
-        g.grasp_quality = 1.0
-        g.approach = self.get_gripper_translation(0.05, 0.15)
-        g.retreat = self.get_gripper_translation(0.05, 0.15, -1.0)
-        #g.max_contact_force
-        #g.allowed_touch_objects[]
-        return [g]
-
-    def get_place_locations(self, pose_stamped):
-        l = PlaceLocation()
-        l.id = 'name2'
-        l.place_pose = pose_stamped
-        l.approach = self.get_gripper_translation(0.05, 0.15)
-        l.retreat = self.get_gripper_translation(0.05, 0.15, -1.0)
-        l.post_place_posture = self.get_gripper_posture(0.05)
-        return [l]
-
-    def get_gripper_posture(self, pose):
-        """ This is Maxwell-specific. """
-        js = JointState()
-        js.name = ['l_gripper_joint', 'r_gripper_joint']
-        js.position = [pose, pose]
-        js.velocity = [0.0, 0.0]
-        js.effort = [1.0, 1.0]
-        return js
-
-    def get_gripper_translation(self, min_dist, desired, axis=1.0):
-        gt = GripperTranslation()
-        gt.direction.vector.x = axis
-        gt.direction.header.frame_id = TRANSLATION_FRAME
-        gt.min_distance = min_dist
-        gt.desired_distance = desired
-        return gt
-
-class PickupManager(GraspManager):
-    def __init__(self, group, ee):
-        GraspManager.__init__(self, group, ee)
         self.action = actionlib.SimpleActionClient('pickup', PickupAction)
         self.action.wait_for_server()
 
-    def pickup(self, name, grasps):
-        g = PickupGoal()
-        g.target_name = name
-        g.group_name = self.group
-        g.end_effector = self.effector
-        g.possible_grasps = grasps
-        #g.support_surface_name = ??
-        #g.allow_gripper_support_collision = ??
-        g.attached_object_touch_links = list() # empty list = use all links of end-effector
-                #["right_gripper_finger_link","right_gripper_finger_link"] 
-        #g.path_constraints = ??
-        #g.allowed_touch_objects = ['part']
-        g.allowed_planning_time = 30.0
-        #g.planning_options.planning_scene_diff = ??
-        g.planning_options.plan_only = False
-        self.action.send_goal(g)
-        self.action.wait_for_result()
-        print(self.action.get_result().error_code.val)
+    #TODO: create iterative grasp generator. If error_code.val == -1, get next grasp
+    def pickup(self, name, pose_stamped):
+        """ This will try to pick up a chess piece. """
+        i = 1
+        for grasp in get_grasps(pose_stamped):
+            g = PickupGoal()
+            g.target_name = name
+            g.group_name = self.group
+            g.end_effector = self.effector
+            g.possible_grasps = [grasp]
+            g.support_surface_name = "table"
+            g.allow_gripper_support_collision = True
+            g.attached_object_touch_links = list() # empty list = use all links of end-effector
+            #g.path_constraints = ??
+            #g.allowed_touch_objects = ['part']
+            g.allowed_planning_time = 30.0
+            #g.planning_options.planning_scene_diff = ??
+            g.planning_options.plan_only = False
+            self.action.send_goal(g)
+            self.action.wait_for_result()
+            if self.action.get_result().error_code.val == 1:
+                rospy.loginfo("Pick succeeded")
+                return
+            rospy.loginfo("Failed Pick attempt %d" % i)
+            i += 1
 
-class PlaceManager(GraspManager):
+class PlaceManager:
     def __init__(self, group, ee):
-        GraspManager.__init__(self, group, ee)
+        self.group = group
+        self.effector = ee
         self.action = actionlib.SimpleActionClient('place', PlaceAction)
         self.action.wait_for_server()
 
-    def place(self, name, locations):
-        g = PlaceGoal()
-        g.group_name = self.group
-        g.attached_object_name = name
-        g.place_locations = locations
-        #g.support_surface_name = ??
-        #g.allow_gripper_support_collision = ??
-        #g.path_constraints = ??
-        #g.allowed_touch_objects = ['part']
-        g.allowed_planning_time = 30.0
-        #g.planning_options.planning_scene_diff = ??
-        g.planning_options.plan_only = False
-        self.action.send_goal(g)
-        self.action.wait_for_result()
-        print(self.action.get_result().error_code.val)
-        
+    def place(self, name, pose_stamped):
+        i = 1
+        for location in get_place_locations(pose_stamped):
+            g = PlaceGoal()
+            g.group_name = self.group
+            g.attached_object_name = name
+            g.place_locations = [location]
+            g.support_surface_name = "table"
+            g.allow_gripper_support_collision = True
+            #g.path_constraints = ??
+            #g.allowed_touch_objects = ['part']
+            g.allowed_planning_time = 30.0
+            #g.planning_options.planning_scene_diff = ??
+            g.planning_options.plan_only = False
+            self.action.send_goal(g)
+            self.action.wait_for_result()
+            if self.action.get_result().error_code.val == 1:
+                rospy.loginfo("Place succeeded")
+                return
+            rospy.loginfo("Failed place attempt %d" % i)
+            i += 1
 
 class ObjectManager:
     def __init__(self, frame):
@@ -142,14 +176,14 @@ class ObjectManager:
         self._collision = list()
         rospy.Subscriber('move_group/monitored_planning_scene', PlanningScene, self.sceneCb)
 
-    def addCube(self, name, size, x, y, z):
+    def addBox(self, name, size_x, size_y, size_z, x, y, z):
         o = CollisionObject()
         o.header.stamp = rospy.Time.now()
         o.header.frame_id = self._fixed_frame
         o.id = name
 
         s = SolidPrimitive()
-        s.dimensions = [size, size, size]
+        s.dimensions = [size_x, size_y, size_z]
         s.type = s.BOX
         o.primitives.append(s)
 
@@ -168,6 +202,10 @@ class ObjectManager:
             rospy.logdebug('Waiting for object to add')
             self._pub.publish(o)
             rospy.sleep(1.0)
+
+
+    def addCube(self, name, size, x, y, z):
+        self.addBox(name, size, size, size, x, y, z)
 
     def remove(self, name):
         """ Remove a an object. """
@@ -224,34 +262,49 @@ if __name__=='__main__':
     rospy.sleep(3.0)
 
     obj.remove('part')
-    print('Removed part')
+    obj.remove('table')
+    for y in [0,1,6,7]:
+        for x in range(8):
+            obj.remove(chr(97+x)+str(y+1))
 
     p = PoseStamped()
     p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
     p.header.frame_id = 'chess_board'
-    p.pose.position.x = .15 #0.05715*(0.5+2)
-    p.pose.position.y = .10 #0.05715*(0.5)
-    p.pose.position.z = -0.3 #0.05
-    q = quaternion_from_euler(0.0, 1.57, 0)
+    p.pose.position.x = 0.05715 * 4 #.15 #0.05715*(0.5+2)
+    p.pose.position.y = 0.05715 * 4 #.20 #0.05715*(0.5)
+    p.pose.position.z = -0.05 #-0.3 #0.05
+    q = quaternion_from_euler(0.0, 0, 0)
     p.pose.orientation.x = q[0]
     p.pose.orientation.y = q[1]
     p.pose.orientation.z = q[2]
     p.pose.orientation.w = q[3]
     p_transformed = listener.transformPose('base_link', p)
 
-    obj.addCube('part', 0.01, p_transformed.pose.position.x, p_transformed.pose.position.y, p_transformed.pose.position.z)
-    print('Added part')
+    obj.addBox('table', 0.05715 * 8, 0.05715 * 8, .1, p_transformed.pose.position.x, p_transformed.pose.position.y, p_transformed.pose.position.z)
+    p.pose.position.z = 0
 
-    g = pick.get_grasps(p_transformed)
-    pick.pickup('part', g)
+    for y in [0,1,6,7]:
+        for x in range(8):
+            p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
+            p.pose.position.x = 0.05715*(0.5+x)
+            p.pose.position.y = 0.05715*(0.5+y)
+            p.pose.position.z = 0.03
+            p_transformed = listener.transformPose('base_link', p)
+            obj.addCube(chr(97+x)+str(y+1), 0.015, p_transformed.pose.position.x, p_transformed.pose.position.y, p_transformed.pose.position.z)
+
+    p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
+    p.pose.position.x = 0.05715 * (0.5 + 4)
+    p.pose.position.y = 0.05715 * (0.5 + 1)
+    p_transformed = listener.transformPose('base_link', p)
+
+    pick.pickup('e2', p_transformed)
     rospy.sleep(1.0)
 
-    p_transformed.pose.position.y += 0.05
+    p_transformed.pose.position.x += 0.05715*2
     #p_transformed.pose.position.x -= 0.025
     #p_transformed.pose.position.z += 0.1
-    l = place.get_place_locations(p_transformed)
-    place.place('part', l)
-            
+    place.place('e2', p_transformed)
+
 
 
     
