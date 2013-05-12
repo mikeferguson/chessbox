@@ -1,0 +1,9 @@
+- git: {local-name: moveit_core, uri: 'https://github.com/ros-planning/moveit_core.git', version: 0.3.18}
+- git: {local-name: moveit_ros, uri: 'https://github.com/ros-planning/moveit_ros.git', version: 0.3.30}
+#- git: {local-name: moveit_planners, uri: 'https://github.com/ros-planning/moveit_planners.git'}
+#- git: {local-name: moveit_msgs, uri: 'https://github.com/ros-planning/moveit_msgs.git'}
+#- git: {local-name: geometric_shapes, uri: 'https://github.com/ros-planning/geometric_shapes.git'}
+- git: {local-name: maxwell, uri: 'git@github.com:mikeferguson/maxwell.git', version: sixdof}
+- git: {local-name: chessbox, uri: 'git@github.com:mikeferguson/chessbox.git', version: master}
+- git: {local-name: arbotix_ros, uri: 'git@github.com:vanadiumlabs/arbotix_ros.git', version: groovy-devel}
+
