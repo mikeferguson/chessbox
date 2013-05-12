@@ -34,7 +34,9 @@ from moveit_msgs.msg import PickupAction, PickupGoal, PlaceAction, PlaceGoal
 from moveit_msgs.msg import AttachedCollisionObject, CollisionObject, PlanningScene
 from manipulation_msgs.msg import Grasp, GripperTranslation, PlaceLocation
 
-TRANSLATION_FRAME = 'arm_wrist_roll_link'
+# The frame used for approach and retreat translations, gripper_link is local
+#   so approach/translation gets transformed by the grasp orientation
+TRANSLATION_FRAME = 'gripper_link'
 
 def get_gripper_posture(pose):
     """ This is Maxwell-specific. """
