@@ -30,26 +30,38 @@ from tf.transformations import euler_from_quaternion, quaternion_from_euler
 from sensor_msgs.msg import JointState
 from geometry_msgs.msg import PoseStamped
 from shape_msgs.msg import SolidPrimitive
-from moveit_msgs.msg import PickupAction, PickupGoal, PlaceAction, PlaceGoal
+from moveit_msgs.msg import PickupAction, PickupGoal, PlaceAction, PlaceGoal, MoveGroupAction, MoveGroupGoal
+from moveit_msgs.msg import Constraints, JointConstraint, PositionConstraint, OrientationConstraint
 from moveit_msgs.msg import AttachedCollisionObject, CollisionObject, PlanningScene
 from manipulation_msgs.msg import Grasp, GripperTranslation, PlaceLocation
 
-from chess_utilities import SQUARE_SIZE
+from chess_utilities import SQUARE_SIZE #castling_extras
 
 # The frame used for approach and retreat translations, gripper_link is local
 #   so approach/translation gets transformed by the grasp orientation
-TRANSLATION_FRAME = 'gripper_link'
+GRIPPER_FRAME = 'gripper_link'
+
+# The frame that all objects/poses should be translated to, the frame in which
+#   moveit planning is done
+FIXED_FRAME = 'base_link'
+
+# Should we only plan, and not execute?
+PLAN_ONLY = False
 
 # This was previously 0.0075
 GRIPPER_CLOSED = 0.01
 GRIPPER_OPEN = 0.05
+
+# Tucking the arm requires a set of joint constraints
+joint_names = ['arm_lift_joint', 'arm_shoulder_pan_joint', 'arm_upperarm_roll_joint', 'arm_shoulder_lift_joint', 'arm_elbow_flex_joint', 'arm_wrist_flex_joint', 'arm_wrist_roll_joint']
+joints_tucked  = [0.0, -1.57, 0.0, -1.7, 1.7, 1.6157930965728755, -0.066472500808377785]
 
 # TODO: This is currently quite the hack. The simple_moveit_plugin will use the
 #       js.position[0] as the input to the gripper (which is interpreted as how
 #       wide to open the gripper, not the joint angle). Should either figure out
 #       how to hide *_gripper_joint from moveit (preferred) or how to pass the
 #       values more correctly at least.
-def get_gripper_posture(pose):
+def getGripperPosture(pose):
     """ This is Maxwell-specific. """
     js = JointState()
     js.name = ['l_gripper_joint', 'r_gripper_joint']
@@ -58,10 +70,10 @@ def get_gripper_posture(pose):
     js.effort = [1.0, 1.0]
     return js
 
-def get_gripper_translation(min_dist, desired, axis=1.0):
+def getGripperTranslation(min_dist, desired, axis=1.0):
     gt = GripperTranslation()
     gt.direction.vector.x = axis
-    gt.direction.header.frame_id = TRANSLATION_FRAME
+    gt.direction.header.frame_id = GRIPPER_FRAME
     gt.min_distance = min_dist
     gt.desired_distance = desired
     return gt
@@ -70,17 +82,17 @@ def get_gripper_translation(min_dist, desired, axis=1.0):
 #       gripper_link -- at some point, should see if we can remove it all and just
 #       pass a list of grasps to moveit (previously, it crashed with an Eigen error
 #       and I just didn't have time to fix it)
-def get_grasps(pose_stamped):
+def getGrasps(pose_stamped):
     """ Returns an iterator of increasingly worse grasps. """
     g = Grasp()
     # directly overhead first
     g.id = 'direct_overhead'
-    g.pre_grasp_posture = get_gripper_posture(GRIPPER_OPEN)
-    g.grasp_posture = get_gripper_posture(GRIPPER_CLOSED)
+    g.pre_grasp_posture = getGripperPosture(GRIPPER_OPEN)
+    g.grasp_posture = getGripperPosture(GRIPPER_CLOSED)
     g.grasp_pose = pose_stamped
     g.grasp_quality = 1.0
-    g.approach = get_gripper_translation(0.05, 0.15)
-    g.retreat = get_gripper_translation(0.05, 0.15, -1.0)
+    g.approach = getGripperTranslation(0.05, 0.15)
+    g.retreat = getGripperTranslation(0.05, 0.15, -1.0)
     #g.max_contact_force =
     #g.allowed_touch_objects[] =
     yield g
@@ -96,15 +108,15 @@ def get_grasps(pose_stamped):
             g.grasp_quality = 1.0 - p - y/4.0
             yield g
 
-def get_place_locations(pose_stamped):
+def getPlaceLocations(pose_stamped):
     """ Returns an iterator of increasingly worse place locations. """
     l = PlaceLocation()
     # directly overhead first
     l.id = 'direct_overhead'
     l.place_pose = pose_stamped
-    l.approach = get_gripper_translation(0.05, 0.15)
-    l.retreat = get_gripper_translation(0.05, 0.15, -1.0)
-    l.post_place_posture = get_gripper_posture(GRIPPER_OPEN)
+    l.approach = getGripperTranslation(0.05, 0.15)
+    l.retreat = getGripperTranslation(0.05, 0.15, -1.0)
+    l.post_place_posture = getGripperPosture(GRIPPER_OPEN)
     yield l
     # now tilt the hand a bit, and rotate about yaw
     for p in [0.05, 0.1, 0.2]:
@@ -118,20 +130,22 @@ def get_place_locations(pose_stamped):
             yield l
 
 class PickupManager:
+    """ This class enables a pick action. """
+
     def __init__(self, group, ee):
-        self.group = group
-        self.effector = ee
-        self.action = actionlib.SimpleActionClient('pickup', PickupAction)
-        self.action.wait_for_server()
+        self._group = group
+        self._effector = ee
+        self._action = actionlib.SimpleActionClient('pickup', PickupAction)
+        self._action.wait_for_server()
 
     def pickup(self, name, pose_stamped):
         """ This will try to pick up a chess piece. """
         i = 1
-        for grasp in get_grasps(pose_stamped):
+        for grasp in getGrasps(pose_stamped):
             g = PickupGoal()
             g.target_name = name
-            g.group_name = self.group
-            g.end_effector = self.effector
+            g.group_name = self._group
+            g.end_effector = self._effector
             g.possible_grasps = [grasp]
             g.support_surface_name = "table"
             g.allow_gripper_support_collision = True
@@ -140,27 +154,29 @@ class PickupManager:
             #g.allowed_touch_objects = ['part']
             g.allowed_planning_time = 30.0
             #g.planning_options.planning_scene_diff = ??
-            g.planning_options.plan_only = False
-            self.action.send_goal(g)
-            self.action.wait_for_result()
-            if self.action.get_result().error_code.val == 1:
+            g.planning_options.plan_only = PLAN_ONLY
+            self._action.send_goal(g)
+            self._action.wait_for_result()
+            if self._action.get_result().error_code.val == 1:
                 rospy.loginfo("Pick succeeded")
                 return
             rospy.loginfo("Failed Pick attempt %d" % i)
             i += 1
 
 class PlaceManager:
+    """ This class enables a place action. """
+
     def __init__(self, group, ee):
-        self.group = group
-        self.effector = ee
-        self.action = actionlib.SimpleActionClient('place', PlaceAction)
-        self.action.wait_for_server()
+        self._group = group
+        self._effector = ee
+        self._action = actionlib.SimpleActionClient('place', PlaceAction)
+        self._action.wait_for_server()
 
     def place(self, name, pose_stamped):
         i = 1
-        for location in get_place_locations(pose_stamped):
+        for location in getPlaceLocations(pose_stamped):
             g = PlaceGoal()
-            g.group_name = self.group
+            g.group_name = self._group
             g.attached_object_name = name
             g.place_locations = [location]
             g.support_surface_name = "table"
@@ -169,15 +185,113 @@ class PlaceManager:
             #g.allowed_touch_objects = ['part']
             g.allowed_planning_time = 30.0
             #g.planning_options.planning_scene_diff = ??
-            g.planning_options.plan_only = False
-            self.action.send_goal(g)
-            self.action.wait_for_result()
-            if self.action.get_result().error_code.val == 1:
+            g.planning_options.plan_only = PLAN_ONLY
+            self._action.send_goal(g)
+            self._action.wait_for_result()
+            if self._action.get_result().error_code.val == 1:
                 rospy.loginfo("Place succeeded")
                 return
             rospy.loginfo("Failed place attempt %d" % i)
             i += 1
 
+class MotionManager:
+    """ This class is used for generic motion planning requests. """
+
+    def __init__(self, group, frame, listener = None):
+        self._group = group
+        self._fixed_frame = frame
+        self._action = actionlib.SimpleActionClient('move_group', MoveGroupAction)
+        self._action.wait_for_server()
+        if listener == None:
+            self._listener = TransformListener()
+        else:
+            self._listener = listener
+
+    def moveToJointPosition(self, joints, positions, tolerance = 0.01):
+        g = MoveGroupGoal()
+        # 1. fill in workspace_parameters
+        # 2. fill in start_state
+        # 3. fill in goal_constraints
+        c1 = Constraints()
+        for i in range(len(joints)):
+            c1.joint_constraints.append(JointConstraint())
+            c1.joint_constraints[i].joint_name = joints[i]
+            c1.joint_constraints[i].position = positions[i]
+            c1.joint_constraints[i].tolerance_above = tolerance
+            c1.joint_constraints[i].tolerance_below = tolerance
+            c1.joint_constraints[i].weight = 1.0
+        g.request.goal_constraints.append(c1)
+        # 4. fill in path constraints
+        # 5. fill in trajectory constraints
+        # 6. fill in planner id
+        # 7. fill in group name
+        g.request.group_name = self._group
+        # 8. fill in number of planning attempts
+        g.request.num_planning_attempts = 1
+        # 9. fill in allowed planning time
+        g.request.allowed_planning_time = 15.0
+        # TODO: fill in
+        # g.planning_options.planning_scene_diff.allowed_collision_matrix
+        g.planning_options.plan_only = PLAN_ONLY
+        g.planning_options.look_around = False
+        g.planning_options.replan = False
+        self._action.send_goal(g)
+        self._action.wait_for_result()
+        return self._action.get_result()
+
+    def moveToPose(self, pose_stamped):
+        """ Move the arm, based on a goal pose_stamped for the end effector. """
+        g = MoveGroupGoal()
+        pose_transformed = self.listener.transformPose(self._fixed_frame, pose_stamped)
+
+        # 1. fill in workspace_parameters
+        # 2. fill in start_state
+        # 3. fill in goal_constraints
+        c1 = Constraints()
+
+        c1.position_constraints.append(PositionConstraint())
+        c1.position_constraints[0].header.frame_id = self._fixed_frame
+        c1.position_constraints[0].link_name = GRIPPER_FRAME
+        b = BoundingVolume()
+        s = SolidPrimitive()
+        s.dimensions = [0.0001]
+        s.type = s.SPHERE
+        b.primitives.append(s)
+        b.primitive_poses.append(goal_transformed.pose)
+        c1.position_constraints[0].constraint_region = b
+        c1.position_constraints[0].weight = 1.0
+
+        c1.orientation_constraints.append(OrientationConstraint())
+        c1.orientation_constraints[0].header.frame_id = self._fixed_frame
+        c1.orientation_constraints[0].orientation = goal_transformed.pose.orientation
+        c1.orientation_constraints[0].link_name = GRIPPER_FRAME
+        c1.orientation_constraints[0].absolute_x_axis_tolerance = 1.0
+        c1.orientation_constraints[0].absolute_y_axis_tolerance = 1.0
+        c1.orientation_constraints[0].absolute_z_axis_tolerance = 0.5
+        c1.orientation_constraints[0].weight = 1.0
+
+        g.request.goal_constraints.append(c1)
+
+        # 4. fill in path constraints
+        # 5. fill in trajectory constraints
+        # 6. fill in planner id
+        # 7. fill in group name
+        g.request.group_name = self._group
+        # 8. fill in number of planning attempts
+        g.request.num_planning_attempts = 1
+        # 9. fill in allowed planning time
+        g.request.allowed_planning_time = 15.0
+        # TODO: fill in
+        # g.planning_options.planning_scene_diff.allowed_collision_matrix
+        g.planning_options.plan_only = PLAN_ONLY
+        g.planning_options.look_around = False
+        g.planning_options.replan = False
+
+        self._action.send_goal(g)
+        self._action.wait_for_result()
+        return self._action.get_result()
+
+# TODO: Add a 'mass' add function
 class ObjectManager:
     def __init__(self, frame):
         self._fixed_frame = frame
@@ -218,7 +332,6 @@ class ObjectManager:
             rospy.logdebug('Waiting for object to add')
             self._pub.publish(o)
             rospy.sleep(1.0)
-
 
     def addCube(self, name, size, x, y, z):
         self.addBox(name, size, size, size, x, y, z)
@@ -268,13 +381,13 @@ class ObjectManager:
         self._mutex.release()
         return l
 
-
 if __name__=='__main__':
     rospy.init_node('grasp_utilities')
     pick = PickupManager('Arm', 'Gripper')
     place = PlaceManager('Arm', 'Gripper')
-    obj = ObjectManager('base_link')
+    obj = ObjectManager(FIXED_FRAME)
     listener = TransformListener()
+    move = MotionManager('Arm', FIXED_FRAME, listener)
     rospy.sleep(3.0)
 
     obj.remove('part')
@@ -294,7 +407,7 @@ if __name__=='__main__':
     p.pose.orientation.y = q[1]
     p.pose.orientation.z = q[2]
     p.pose.orientation.w = q[3]
-    p_transformed = listener.transformPose('base_link', p)
+    p_transformed = listener.transformPose(FIXED_FRAME, p)
 
     obj.addBox('table', 0.05715 * 8, 0.05715 * 8, .1, p_transformed.pose.position.x, p_transformed.pose.position.y, p_transformed.pose.position.z)
     p.pose.position.z = 0
@@ -305,13 +418,13 @@ if __name__=='__main__':
             p.pose.position.x = SQUARE_SIZE*(0.5+x)
             p.pose.position.y = SQUARE_SIZE*(0.5+y)
             p.pose.position.z = 0.03
-            p_transformed = listener.transformPose('base_link', p)
+            p_transformed = listener.transformPose(FIXED_FRAME, p)
             obj.addCube(chr(97+x)+str(y+1), 0.015, p_transformed.pose.position.x, p_transformed.pose.position.y, p_transformed.pose.position.z)
 
     p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
     p.pose.position.x = SQUARE_SIZE * (0.5 + 4)
     p.pose.position.y = SQUARE_SIZE * (0.5 + 1)
-    p_transformed = listener.transformPose('base_link', p)
+    p_transformed = listener.transformPose(FIXED_FRAME, p)
 
     pick.pickup('e2', p_transformed)
     rospy.sleep(1.0)
@@ -320,4 +433,7 @@ if __name__=='__main__':
     #p_transformed.pose.position.x -= 0.025
     #p_transformed.pose.position.z += 0.1
     place.place('e2', p_transformed)
-    
+
+    # tuck arm
+    move.moveToJointPosition(joint_names, joints_tucked)
+
