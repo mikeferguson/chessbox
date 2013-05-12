@@ -38,6 +38,15 @@ from manipulation_msgs.msg import Grasp, GripperTranslation, PlaceLocation
 #   so approach/translation gets transformed by the grasp orientation
 TRANSLATION_FRAME = 'gripper_link'
 
+# This was previously 0.0075
+GRIPPER_CLOSED = 0.01
+GRIPPER_OPEN = 0.05
+
+# TODO: This is currently quite the hack. The simple_moveit_plugin will use the
+#       js.position[0] as the input to the gripper (which is interpreted as how
+#       wide to open the gripper, not the joint angle). Should either figure out
+#       how to hide *_gripper_joint from moveit (preferred) or how to pass the
+#       values more correctly at least.
 def get_gripper_posture(pose):
     """ This is Maxwell-specific. """
     js = JointState()
@@ -55,19 +64,23 @@ def get_gripper_translation(min_dist, desired, axis=1.0):
     gt.desired_distance = desired
     return gt
 
+# TODO: all this generator crap was created before changing approach frame to
+#       gripper_link -- at some point, should see if we can remove it all and just
+#       pass a list of grasps to moveit (previously, it crashed with an Eigen error
+#       and I just didn't have time to fix it)
 def get_grasps(pose_stamped):
     """ Returns an iterator of increasingly worse grasps. """
     g = Grasp()
     # directly overhead first
     g.id = 'direct_overhead'
-    g.pre_grasp_posture = get_gripper_posture(0.05)
-    g.grasp_posture = get_gripper_posture(0.01) # was 0.0075
+    g.pre_grasp_posture = get_gripper_posture(GRIPPER_OPEN)
+    g.grasp_posture = get_gripper_posture(GRIPPER_CLOSED)
     g.grasp_pose = pose_stamped
     g.grasp_quality = 1.0
     g.approach = get_gripper_translation(0.05, 0.15)
     g.retreat = get_gripper_translation(0.05, 0.15, -1.0)
-    #g.max_contact_force
-    #g.allowed_touch_objects[]
+    #g.max_contact_force =
+    #g.allowed_touch_objects[] =
     yield g
     # now tilt the hand a bit, and rotate about yaw
     for p in [0.05, 0.1, 0.2]:
@@ -89,7 +102,7 @@ def get_place_locations(pose_stamped):
     l.place_pose = pose_stamped
     l.approach = get_gripper_translation(0.05, 0.15)
     l.retreat = get_gripper_translation(0.05, 0.15, -1.0)
-    l.post_place_posture = get_gripper_posture(0.05)
+    l.post_place_posture = get_gripper_posture(GRIPPER_OPEN)
     yield l
     # now tilt the hand a bit, and rotate about yaw
     for p in [0.05, 0.1, 0.2]:
@@ -109,7 +122,6 @@ class PickupManager:
         self.action = actionlib.SimpleActionClient('pickup', PickupAction)
         self.action.wait_for_server()
 
-    #TODO: create iterative grasp generator. If error_code.val == -1, get next grasp
     def pickup(self, name, pose_stamped):
         """ This will try to pick up a chess piece. """
         i = 1
