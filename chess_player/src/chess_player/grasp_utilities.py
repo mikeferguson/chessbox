@@ -533,9 +533,9 @@ if __name__=='__main__':
     p = PoseStamped()
     p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
     p.header.frame_id = 'chess_board'
-    p.pose.position.x = SQUARE_SIZE * 4 #.15 #0.05715*(0.5+2)
-    p.pose.position.y = SQUARE_SIZE * 4 #.20 #0.05715*(0.5)
-    p.pose.position.z = -0.05 #-0.3 #0.05
+    p.pose.position.x = SQUARE_SIZE * 4
+    p.pose.position.y = SQUARE_SIZE * 4
+    p.pose.position.z = -0.05
     q = quaternion_from_euler(0.0, 0, 0)
     p.pose.orientation.x = q[0]
     p.pose.orientation.y = q[1]
@@ -564,10 +564,5 @@ if __name__=='__main__':
     rospy.sleep(1.0)
 
     p_transformed.pose.position.x += SQUARE_SIZE*2
-    #p_transformed.pose.position.x -= 0.025
-    #p_transformed.pose.position.z += 0.1
     place.place('e2', p_transformed)
-
-    # tuck arm
-    move.moveToJointPosition(joint_names, joints_tucked)
 
