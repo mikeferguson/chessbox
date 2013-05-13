@@ -33,5 +33,4 @@ This is the n-th generation chess code, which was originally developed for AAAI 
     roslaunch maxwell_defs fake_maxwell.launch
     roslaunch maxwell_moveit_config move_group.launch
     rosrun tf static_transform_publisher .15 .2286 .7366 -1.57 0 0 base_link chess_board 20
-    rosrun chess_perception chess_perception
-    rosrun ches_player chess_executive.py _side:=white --sim
+    rosrun chess_player chess_executive.py --sim
