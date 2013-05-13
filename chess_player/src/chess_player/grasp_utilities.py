@@ -162,9 +162,10 @@ class PickupManager:
             self._action.wait_for_result()
             if self._action.get_result().error_code.val == 1:
                 rospy.loginfo("Pick succeeded")
-                return
+                return True
             rospy.loginfo("Failed Pick attempt %d" % i)
             i += 1
+        return False
 
 class PlaceManager:
     """ This class enables a place action. """
@@ -193,9 +194,10 @@ class PlaceManager:
             self._action.wait_for_result()
             if self._action.get_result().error_code.val == 1:
                 rospy.loginfo("Place succeeded")
-                return
+                return True
             rospy.loginfo("Failed place attempt %d" % i)
             i += 1
+        return False
 
 class MotionManager:
     """ This class is used for generic motion planning requests. """
@@ -400,6 +402,7 @@ class ArmPlanner:
         if self._listener == None:
             self._listener = TransformListener()
         self._move = MotionManager(self._group, FIXED_FRAME, self._listener)
+        self.success = True
 
     def move_piece(self, start_pose, end_pose):
         # update table
@@ -421,23 +424,27 @@ class ArmPlanner:
         rospy.loginfo('Updating piece position')
         self._obj.remove('piece')
         # insert piece
+        p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
         p.pose.position.x = start_pose.position.x
         p.pose.position.y = start_pose.position.y
         p.pose.position.z = 0.03
         pt = self._listener.transformPose(FIXED_FRAME, p)
         self._obj.addCube('piece', 0.015, pt.pose.position.x, pt.pose.position.y, pt.pose.position.z)
-        self.untuck()
+        #self.untuck()
         # pick it up
         rospy.loginfo('Picking piece')
-        self._pick.pickup('piece', pt)
+        if not self._pick.pickup('piece', pt):
+            return False
         rospy.sleep(1.0)
         # put it down
         rospy.loginfo('Placing piece')
+        p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
         p.pose.position.x = end_pose.position.x
         p.pose.position.y = end_pose.position.y
         p.pose.position.z = 0.03
         pt = self._listener.transformPose(FIXED_FRAME, p)
         self._place.place('piece', pt)
+        return True
 
     def execute(self, move, board):
         """ Execute a move. """
@@ -457,6 +464,7 @@ class ArmPlanner:
             off_board.pose.position.z = fr.pose.position.z
             if not self.move_piece(to.pose, off_board.pose):
                 rospy.logerr('Failed to move captured piece')
+                self.success = False
                 self.tuck()
                 return None
 
@@ -465,6 +473,7 @@ class ArmPlanner:
         to.pose = self.getPose(col_t, rank_t, board, fr.pose.position.z)
         if not self.move_piece(fr.pose, to.pose):
             rospy.logerr('Failed to move my piece')
+            self.success = False
             self.tuck()
             return None
 
