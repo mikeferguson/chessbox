@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-""" 
+"""
   Copyright (c) 2011 Michael E. Ferguson. All right reserved.
 
   This program is free software; you can redistribute it and/or modify
@@ -33,7 +33,7 @@ SQUARE_SIZE = 0.05715
 
 # extra move to be made for castling
 castling_extras = { "e1c1" : "a1d1",
-                    "e1g1" : "h1f1", 
+                    "e1g1" : "h1f1",
                     "e8c8" : "a8d8",
                     "e8g8" : "h8f8" }
 
@@ -43,7 +43,7 @@ class BoardState:
     BLACK = -1
 
     def __init__(self, side=None):
-        """ 
+        """
         Initialize an empty board
         """
         self.values = [None for i in range(64)]
@@ -54,50 +54,56 @@ class BoardState:
         self.castling_move = None
 
     def newGame(self):
-        """ 
+        """
         Initialize a new board
         """
         self.last_move = "go"
         self.values = [None for i in range(64)]
         for i in range(8):
-            self.setPiece(i, 2, self.makePiece(ChessPiece.WHITE_PAWN))
-            self.setPiece(i, 7, self.makePiece(ChessPiece.BLACK_PAWN))
+            self.setPiece(i, 2, self.makePiece(ChessPiece.WHITE_PAWN, i, 2))
+            self.setPiece(i, 7, self.makePiece(ChessPiece.BLACK_PAWN, i, 7))
 
-        self.setPiece('a', 1, self.makePiece(ChessPiece.WHITE_ROOK))
-        self.setPiece('b', 1, self.makePiece(ChessPiece.WHITE_KNIGHT))
-        self.setPiece('c', 1, self.makePiece(ChessPiece.WHITE_BISHOP))
-        self.setPiece('d', 1, self.makePiece(ChessPiece.WHITE_QUEEN))
-        self.setPiece('e', 1, self.makePiece(ChessPiece.WHITE_KING))
-        self.setPiece('f', 1, self.makePiece(ChessPiece.WHITE_BISHOP))
-        self.setPiece('g', 1, self.makePiece(ChessPiece.WHITE_KNIGHT))
-        self.setPiece('h', 1, self.makePiece(ChessPiece.WHITE_ROOK))
+        self.setPiece('a', 1, self.makePiece(ChessPiece.WHITE_ROOK, 'a', 1))
+        self.setPiece('b', 1, self.makePiece(ChessPiece.WHITE_KNIGHT, 'b', 1))
+        self.setPiece('c', 1, self.makePiece(ChessPiece.WHITE_BISHOP, 'c', 1))
+        self.setPiece('d', 1, self.makePiece(ChessPiece.WHITE_QUEEN, 'd', 1))
+        self.setPiece('e', 1, self.makePiece(ChessPiece.WHITE_KING, 'e', 1))
+        self.setPiece('f', 1, self.makePiece(ChessPiece.WHITE_BISHOP, 'f', 1))
+        self.setPiece('g', 1, self.makePiece(ChessPiece.WHITE_KNIGHT, 'g', 1))
+        self.setPiece('h', 1, self.makePiece(ChessPiece.WHITE_ROOK, 'h', 1))
 
-        self.setPiece('a', 8, self.makePiece(ChessPiece.BLACK_ROOK))
-        self.setPiece('b', 8, self.makePiece(ChessPiece.BLACK_KNIGHT))
-        self.setPiece('c', 8, self.makePiece(ChessPiece.BLACK_BISHOP))
-        self.setPiece('d', 8, self.makePiece(ChessPiece.BLACK_QUEEN))
-        self.setPiece('e', 8, self.makePiece(ChessPiece.BLACK_KING))
-        self.setPiece('f', 8, self.makePiece(ChessPiece.BLACK_BISHOP))
-        self.setPiece('g', 8, self.makePiece(ChessPiece.BLACK_KNIGHT))
-        self.setPiece('h', 8, self.makePiece(ChessPiece.BLACK_ROOK))            
+        self.setPiece('a', 8, self.makePiece(ChessPiece.BLACK_ROOK, 'a', 8))
+        self.setPiece('b', 8, self.makePiece(ChessPiece.BLACK_KNIGHT, 'b', 8))
+        self.setPiece('c', 8, self.makePiece(ChessPiece.BLACK_BISHOP, 'c', 8))
+        self.setPiece('d', 8, self.makePiece(ChessPiece.BLACK_QUEEN, 'd', 8))
+        self.setPiece('e', 8, self.makePiece(ChessPiece.BLACK_KING, 'e', 8))
+        self.setPiece('f', 8, self.makePiece(ChessPiece.BLACK_BISHOP, 'f', 8))
+        self.setPiece('g', 8, self.makePiece(ChessPiece.BLACK_KNIGHT, 'g', 8))
+        self.setPiece('h', 8, self.makePiece(ChessPiece.BLACK_ROOK, 'h', 8))
 
-    def makePiece(self, val, copy=None):
-        """ 
+    def makePiece(self, val, column, rank):
+        """
         Helper function to generate ChessPiece messages.
         """
         p = ChessPiece()
         p.header.frame_id = "chess_board"
-        if copy != None:
-            p.pose = copy.pose
+        p.pose.position.x = SQUARE_SIZE * (0.5 + self.getColIdx(column))
+        p.pose.position.y = SQUARE_SIZE * (0.5 + rank - 1)
+        p.pose.position.z = 0.03
         p.type = val
         return p
 
+    def copyPiece(self, val, copy):
+        p = self.makePiece(self, val, 0, 1)
+        p.pose = copy.pose
+        return p
+
     def setPiece(self, column, rank, piece):
-        """ 
+        """
         Set the value of a piece on the board. The piece
-        should be a chess_msgs/ChessPiece, which has a 
+        should be a chess_msgs/ChessPiece, which has a
         pose and type, or None
-        
+
         Column: 0 or 'a' = column A
         Rank:   1 = rank 1
         """
@@ -106,7 +112,7 @@ class BoardState:
         except:
             print column, rank
             rospy.loginfo("setPiece: invalid row/column")
-        
+
     def getPiece(self, column, rank):
         try:
             return self.values[int(rank-1)*8+self.getColIdx(column)]
@@ -155,10 +161,10 @@ class BoardState:
         (col_t, rank_t) = self.toPosition(move[2:])
         piece = self.getPiece(col_f, rank_f)
         piece.pose = pose
-        self.setPiece(col_t, rank_t, piece) 
+        self.setPiece(col_t, rank_t, piece)
         self.setPiece(col_f, rank_f, None)
         if move in castling_extras.keys():
-            self.applyMove(castling_extras[move])    
+            self.applyMove(castling_extras[move])
 
     def computeSide(self):
         """ Determine which side of the board we are on. """
@@ -167,40 +173,40 @@ class BoardState:
             side += self.getPieceType(c,1)
             side += self.getPieceType(c,2)
             side -= self.getPieceType(c,7)
-            side -= self.getPieceType(c,8)       
+            side -= self.getPieceType(c,8)
             rospy.loginfo("Computed side value of: %d" % side)
         if side > 0:
             self.side = self.WHITE   # good to go
         else:
-            self.side = self.BLACK   
-            # need to setup board 
-            temp_board = BoardState(self.side) 
+            self.side = self.BLACK
+            # need to setup board
+            temp_board = BoardState(self.side)
             for i in range(8):
-                temp_board.setPiece(i, 2, self.makePiece(ChessPiece.WHITE_PAWN, self.getPiece(7-i, 7)) )
-                temp_board.setPiece(i, 7, self.makePiece(ChessPiece.BLACK_PAWN, self.getPiece(7-i, 2)) )
+                temp_board.setPiece(i, 2, self.copyPiece(ChessPiece.WHITE_PAWN, self.getPiece(7-i, 7)) )
+                temp_board.setPiece(i, 7, self.copyPiece(ChessPiece.BLACK_PAWN, self.getPiece(7-i, 2)) )
 
-            temp_board.setPiece('a', 1, self.makePiece(ChessPiece.WHITE_ROOK, self.getPiece('h',8)) )
-            temp_board.setPiece('b', 1, self.makePiece(ChessPiece.WHITE_KNIGHT, self.getPiece('g',8)))
-            temp_board.setPiece('c', 1, self.makePiece(ChessPiece.WHITE_BISHOP, self.getPiece('f',8)))
-            temp_board.setPiece('d', 1, self.makePiece(ChessPiece.WHITE_QUEEN, self.getPiece('e',8)))
-            temp_board.setPiece('e', 1, self.makePiece(ChessPiece.WHITE_KING, self.getPiece('d',8)))
-            temp_board.setPiece('f', 1, self.makePiece(ChessPiece.WHITE_BISHOP, self.getPiece('c',8)))
-            temp_board.setPiece('g', 1, self.makePiece(ChessPiece.WHITE_KNIGHT, self.getPiece('b',8)))
-            temp_board.setPiece('h', 1, self.makePiece(ChessPiece.WHITE_ROOK, self.getPiece('a',8)))
+            temp_board.setPiece('a', 1, self.copyPiece(ChessPiece.WHITE_ROOK, self.getPiece('h',8)) )
+            temp_board.setPiece('b', 1, self.copyPiece(ChessPiece.WHITE_KNIGHT, self.getPiece('g',8)))
+            temp_board.setPiece('c', 1, self.copyPiece(ChessPiece.WHITE_BISHOP, self.getPiece('f',8)))
+            temp_board.setPiece('d', 1, self.copyPiece(ChessPiece.WHITE_QUEEN, self.getPiece('e',8)))
+            temp_board.setPiece('e', 1, self.copyPiece(ChessPiece.WHITE_KING, self.getPiece('d',8)))
+            temp_board.setPiece('f', 1, self.copyPiece(ChessPiece.WHITE_BISHOP, self.getPiece('c',8)))
+            temp_board.setPiece('g', 1, self.copyPiece(ChessPiece.WHITE_KNIGHT, self.getPiece('b',8)))
+            temp_board.setPiece('h', 1, self.copyPiece(ChessPiece.WHITE_ROOK, self.getPiece('a',8)))
 
-            temp_board.setPiece('a', 8, self.makePiece(ChessPiece.BLACK_ROOK, self.getPiece('h',1)) )
-            temp_board.setPiece('b', 8, self.makePiece(ChessPiece.BLACK_KNIGHT, self.getPiece('g',1)) )
-            temp_board.setPiece('c', 8, self.makePiece(ChessPiece.BLACK_BISHOP, self.getPiece('f',1)) )
-            temp_board.setPiece('d', 8, self.makePiece(ChessPiece.BLACK_QUEEN, self.getPiece('e',1)) )
-            temp_board.setPiece('e', 8, self.makePiece(ChessPiece.BLACK_KING, self.getPiece('d',1)) )
-            temp_board.setPiece('f', 8, self.makePiece(ChessPiece.BLACK_BISHOP, self.getPiece('c',1)) )
-            temp_board.setPiece('g', 8, self.makePiece(ChessPiece.BLACK_KNIGHT, self.getPiece('b',1)) )
-            temp_board.setPiece('h', 8, self.makePiece(ChessPiece.BLACK_ROOK, self.getPiece('a',1)) ) 
+            temp_board.setPiece('a', 8, self.copyPiece(ChessPiece.BLACK_ROOK, self.getPiece('h',1)) )
+            temp_board.setPiece('b', 8, self.copyPiece(ChessPiece.BLACK_KNIGHT, self.getPiece('g',1)) )
+            temp_board.setPiece('c', 8, self.copyPiece(ChessPiece.BLACK_BISHOP, self.getPiece('f',1)) )
+            temp_board.setPiece('d', 8, self.copyPiece(ChessPiece.BLACK_QUEEN, self.getPiece('e',1)) )
+            temp_board.setPiece('e', 8, self.copyPiece(ChessPiece.BLACK_KING, self.getPiece('d',1)) )
+            temp_board.setPiece('f', 8, self.copyPiece(ChessPiece.BLACK_BISHOP, self.getPiece('c',1)) )
+            temp_board.setPiece('g', 8, self.copyPiece(ChessPiece.BLACK_KNIGHT, self.getPiece('b',1)) )
+            temp_board.setPiece('h', 8, self.copyPiece(ChessPiece.BLACK_ROOK, self.getPiece('a',1)) )
 
             self.values = temp_board.values
             self.printBoard()
 
-        self.last_move = "go"                
+        self.last_move = "go"
 
     #######################################################
     # helpers
@@ -213,14 +219,14 @@ class BoardState:
         try:
             return chr(ord('a') + col)
         except:
-            return col        
+            return col
 
     def getColIdx(self, col):
         """ Convert to column integer index. """
-        try: 
+        try:
             return int(col)
         except:
-            return ord(col)-ord('a')      
+            return ord(col)-ord('a')
 
     def valid(self, col, rank):
         """ Is a particular position valid? """
@@ -280,12 +286,12 @@ class BoardState:
         return text
 
     def isCastling(self, piece_new, piece_color, piece_gone):
-        """ 
+        """
         Are we castling? Returns one of:
             e1c1 - (also, rook a1d1)
             e1g1 - (also, rook h1f1)
             e8c8 - (also, rook a8d8)
-            e8g8 - (also, rook h8f8)  
+            e8g8 - (also, rook h8f8)
         """
         if len(piece_color) > 0 or len(piece_new) != 2 or len(piece_gone) != 2:
             return None
@@ -315,7 +321,7 @@ class BoardState:
                 return None
         else:
             return None
-                
+
 
 
 class BoardUpdater():
@@ -326,7 +332,7 @@ class BoardUpdater():
         self.up_to_date = False # meaning has changed, now tells whether message has been recieved
 
     def callback(self, message):
-        """ 
+        """
         Update the board state, given a new ChessBoard message.
         """
         # no need to update if already up to date
@@ -470,7 +476,7 @@ class GnuChessEngine:
     def __init__(self):
         """
         Start a connection to GNU chess.
-        """ 
+        """
         self.engine = pexpect.spawn('/usr/games/gnuchess -x')
         self.history = list()
         self.pawning = False
@@ -483,7 +489,7 @@ class GnuChessEngine:
 
     def nextMoveGNU(self, move="go", board=None):
         """
-        Give opponent's move, get back move to make. 
+        Give opponent's move, get back move to make.
             returns None if given an invalid move.
         """
         # get move
@@ -495,14 +501,14 @@ class GnuChessEngine:
                         if p1 != None and abs(p1.type) == ChessPiece.WHITE_PAWN:
                             p2 = board.getPiece(col,row+1)
                             if p2 == None:
-                                # this is a candidate   
+                                # this is a candidate
                                 m = col + str(row) + col + str(row+1)
                                 self.history.append(m)
                                 return m
         else:
-            self.engine.sendline(move)        
+            self.engine.sendline(move)
             if self.engine.expect(['My move is','Illegal move']) == 1:
-                return None     
+                return None
             self.engine.expect('([a-h][1-8][a-h][1-8][RrNnBbQq(\r\n)])')
             m = self.engine.after.rstrip()
         self.history.append(m)
