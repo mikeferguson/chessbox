@@ -28,8 +28,9 @@ from math import sqrt
 from tf.listener import *
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
+from chess_msgs.msg import ChessPiece
 from sensor_msgs.msg import JointState
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Pose
 from shape_msgs.msg import SolidPrimitive
 from moveit_msgs.msg import PickupAction, PickupGoal, PlaceAction, PlaceGoal, MoveGroupAction, MoveGroupGoal
 from moveit_msgs.msg import Constraints, JointConstraint, PositionConstraint, OrientationConstraint
@@ -55,7 +56,8 @@ GRIPPER_OPEN = 0.05
 
 # Tucking the arm requires a set of joint constraints
 joint_names = ['arm_lift_joint', 'arm_shoulder_pan_joint', 'arm_upperarm_roll_joint', 'arm_shoulder_lift_joint', 'arm_elbow_flex_joint', 'arm_wrist_flex_joint', 'arm_wrist_roll_joint']
-joints_tucked  = [0.0, -1.57, 0.0, -1.7, 1.7, 1.6157930965728755, -0.066472500808377785]
+joints_tucked  = [0.0, -1.57, 0.0, -1.7, 1.7, 1.57, -0.066472500808377785]
+joints_untucked  = [0.0, 0.0, 0.0, -1.57, 1.57, 1.57, -0.066472500808377785]
 
 # TODO: This is currently quite the hack. The simple_moveit_plugin will use the
 #       js.position[0] as the input to the gripper (which is interpreted as how
@@ -382,7 +384,7 @@ class ObjectManager:
         self._mutex.release()
         return l
 
-class ArmPlaner:
+class ArmPlanner:
     _group = 'Arm'
     _gripper_group = 'Gripper'
 
@@ -424,6 +426,7 @@ class ArmPlaner:
         p.pose.position.z = 0.03
         pt = self._listener.transformPose(FIXED_FRAME, p)
         self._obj.addCube('piece', 0.015, pt.pose.position.x, pt.pose.position.y, pt.pose.position.z)
+        self.untuck()
         # pick it up
         rospy.loginfo('Picking piece')
         self._pick.pickup('piece', pt)
@@ -453,7 +456,7 @@ class ArmPlaner:
             off_board.pose.position.y = SQUARE_SIZE
             off_board.pose.position.z = fr.pose.position.z
             if not self.move_piece(to.pose, off_board.pose):
-                rospy.logerror('Failed to move captured piece')
+                rospy.logerr('Failed to move captured piece')
                 self.tuck()
                 return None
 
@@ -461,13 +464,13 @@ class ArmPlaner:
         to.header.frame_id = fr.header.frame_id
         to.pose = self.getPose(col_t, rank_t, board, fr.pose.position.z)
         if not self.move_piece(fr.pose, to.pose):
-            rospy.logerror('Failed to move my piece')
+            rospy.logerr('Failed to move my piece')
             self.tuck()
             return None
 
         if move in castling_extras:
             if not self.execute(castling_extras[move],board):
-                rospy.logerror('Failed to carry out castling extra')
+                rospy.logerr('Failed to carry out castling extra')
 
         self.tuck()
         return to.pose
@@ -499,6 +502,9 @@ class ArmPlaner:
 
     def tuck(self):
         self._move.moveToJointPosition(joint_names, joints_tucked)
+
+    def untuck(self):
+        self._move.moveToJointPosition(joint_names, joints_untucked)
 
 if __name__=='__main__':
     rospy.init_node('grasp_utilities')
