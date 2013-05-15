@@ -27,4 +27,7 @@ from chess_player.head_utilities import HeadEngine
 if __name__=='__main__':
     rospy.init_node('tilt_head')
     h = HeadEngine()
-    h.look_at_board()
+    if 'up' in sys.argv:
+        h.look_at_player()
+    else:
+        h.look_at_board()

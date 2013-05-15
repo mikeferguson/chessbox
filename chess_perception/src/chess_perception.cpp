@@ -43,15 +43,22 @@ class ChessPerception
     ChessPerception(ros::NodeHandle & n): nh_ (n)
     {
         debug_ = true;
+        board_to_base_.setIdentity();
 
         /* Subscribe to just the cloud now */
         cloud_sub_ = nh_.subscribe("/camera/depth_registered/points", 1, &ChessPerception::cameraCallback, this);
         output_ = nh_.advertise<chess_msgs::ChessBoard>("chess_board_state", 1);
+
+        /* periodic callback to publish tf */
+        publish_timer_ = nh_.createWallTimer(ros::WallDuration(1.0/30.0), boost::bind(&ChessPerception::publishCallback, this, _1));
     }
 
     /** \brief Main loop */
     void cameraCallback ( pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud )
     {
+        tf::StampedTransform tr2;
+        listener_.lookupTransform("base_link", cloud->header.frame_id, ros::Time(0), tr2);
+
         /* Find potential corner points of board.
          * This is a mostly 2d-operation that is quite fast, but somewhat unreliable.
          * We do this first, so if it fails we can abort the slower table/piece finding.
@@ -63,8 +70,8 @@ class ChessPerception
             ROS_WARN("Unable to detect chess board.");
             return;
         }
-        /* Publish board estimate */
-        br_.sendTransform(tf::StampedTransform(tr, ros::Time::now(), cloud->header.frame_id, "chess_board"));
+        /* Update board estimate */
+        board_to_base_ = tr2 * tr;
 
         /* Find potential centroids/colors of pieces */
         std::vector<pcl::PointXYZ> pieces;
@@ -95,6 +102,12 @@ class ChessPerception
         output_.publish(cb);
     }
 
+    /** \brief Periodic callback to publish tf data */
+    void publishCallback(const ros::WallTimerEvent& event)
+    {
+        br_.sendTransform(tf::StampedTransform(board_to_base_, ros::Time::now(), "base_link", "chess_board"));
+    }
+
   private:
     /* node handles, subscribers, publishers, etc */
     ros::NodeHandle nh_;
@@ -102,8 +115,10 @@ class ChessPerception
     ros::Publisher cloud_pub_;
     ros::Publisher output_;
     ros::Publisher projected_points_cloud_pub_;
+    ros::WallTimer publish_timer_;
     tf::TransformBroadcaster br_;
     tf::TransformListener listener_;
+    tf::Transform board_to_base_;
 
     bool debug_;
 
