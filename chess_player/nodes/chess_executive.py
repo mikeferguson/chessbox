@@ -140,7 +140,6 @@ class ChessExecutive:
                 self.yourMove(True)
                 move = self.getMove()
             # do move
-            self.head.look_at_player()
             if self.board.last_move != "go":
                 self.speech.say("I see you have moved your " + self.board.getMoveText(self.board.last_move))
             rospy.loginfo("exec: My move: %s", move)
