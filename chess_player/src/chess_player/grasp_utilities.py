@@ -105,7 +105,7 @@ def getGrasps(pose_stamped):
     #g.allowed_touch_objects[] =
     yield g
     # now tilt the hand a bit, and rotate about yaw
-    for p in [0.05, 0.1, 0.2, 0.4]:
+    for p in [0.05, 0.1, 0.2, -0.05, -0.1, 0.4, 0.7]:
         for y in [-1.57, -0.78, 0.0, 0.78, 1.57]:
             q = quaternion_from_euler(0, 1.57-p, y)
             g.grasp_pose.pose.orientation.x = q[0]
@@ -133,7 +133,7 @@ def getPlaceLocations(pose_stamped):
     l.post_place_posture = getGripperPosture(GRIPPER_OPEN)
     yield l
     # now tilt the hand a bit, and rotate about yaw
-    for p in [0.05, 0.1, 0.2, 0.4]:
+    for p in [0.05, 0.1, 0.2, -0.05, -0.1, 0.4, 0.7]:
         for y in [-1.57, -0.78, 0.0, 0.78, 1.57]:
             q = quaternion_from_euler(0, 1.57-p, y)
             l.place_pose.pose.orientation.x = q[0]
@@ -401,7 +401,8 @@ class ArmPlanner:
     _group = 'Arm'
     _gripper_group = 'Gripper'
 
-    BOARD_THICKNESS = 0.1
+    # This is a bit hacky, basically I'm making the "table" thick, and not adding individual chess pieces
+    BOARD_THICKNESS = 0.2
     CHESS_BOARD_FRAME = 'chess_board'
 
     """ Chess-specific stuff """
@@ -425,7 +426,7 @@ class ArmPlanner:
         p.header.frame_id = self.CHESS_BOARD_FRAME
         p.pose.position.x = SQUARE_SIZE * 4
         p.pose.position.y = SQUARE_SIZE * 4
-        p.pose.position.z = -self.BOARD_THICKNESS/2.0
+        p.pose.position.z = 0
         p.pose.orientation.x = p.pose.orientation.y = p.pose.orientation.z = 0.0
         p.pose.orientation.w = 1.0
         pt = self._listener.transformPose(FIXED_FRAME, p)
@@ -438,7 +439,7 @@ class ArmPlanner:
         p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
         p.pose.position.x = start_pose.position.x
         p.pose.position.y = start_pose.position.y
-        p.pose.position.z = 0.03
+        p.pose.position.z = 0.045
         pt = self._listener.transformPose(FIXED_FRAME, p)
         self._obj.addCube('piece', 0.015, pt.pose.position.x, pt.pose.position.y, pt.pose.position.z)
         #self.untuck()
@@ -452,7 +453,7 @@ class ArmPlanner:
         p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
         p.pose.position.x = end_pose.position.x
         p.pose.position.y = end_pose.position.y
-        p.pose.position.z = 0.03
+        p.pose.position.z = 0.045
         pt = self._listener.transformPose(FIXED_FRAME, p)
         self._place.place('piece', pt)
         return True
