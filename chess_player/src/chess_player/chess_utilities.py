@@ -94,7 +94,7 @@ class BoardState:
         return p
 
     def copyPiece(self, val, copy):
-        p = self.makePiece(self, val, 0, 1)
+        p = self.makePiece(val, 0, 1)
         p.pose = copy.pose
         return p
 
