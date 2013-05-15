@@ -495,10 +495,15 @@ class GnuChessEngine:
         # get move
         if self.pawning:
             while not rospy.is_shutdown():
-                for row in [2,3,4,5]:
+                rows = [2,3,4,5]
+                piece = ChessPiece.WHITE_PAWN
+                if board.side == board.BLACK:
+                    rows = [7,6,5,4]
+                    piece = ChessPiece.BLACK_PAWN
+                for row in rows:
                     for col in ['a','b','c','d','e','f','g','h']:
                         p1 = board.getPiece(col,row)
-                        if p1 != None and abs(p1.type) == ChessPiece.WHITE_PAWN:
+                        if p1 != None and abs(p1.type) == piece:
                             p2 = board.getPiece(col,row+1)
                             if p2 == None:
                                 # this is a candidate
