@@ -258,7 +258,7 @@ class MotionManager:
     def moveToPose(self, pose_stamped):
         """ Move the arm, based on a goal pose_stamped for the end effector. """
         g = MoveGroupGoal()
-        pose_transformed = self.listener.transformPose(self._fixed_frame, pose_stamped)
+        pose_transformed = self._listener.transformPose(self._fixed_frame, pose_stamped)
 
         # 1. fill in workspace_parameters
         # 2. fill in start_state
