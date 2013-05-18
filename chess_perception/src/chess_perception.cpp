@@ -14,7 +14,7 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software Foundation,
-Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA 
+Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 **/
 
@@ -43,7 +43,9 @@ class ChessPerception
     ChessPerception(ros::NodeHandle & n): nh_ (n)
     {
         debug_ = true;
+        skip_ = 2;
         board_to_base_.setIdentity();
+        frames_ = 0;
 
         /* Subscribe to just the cloud now */
         cloud_sub_ = nh_.subscribe("/camera/depth_registered/points", 1, &ChessPerception::cameraCallback, this);
@@ -56,6 +58,8 @@ class ChessPerception
     /** \brief Main loop */
     void cameraCallback ( pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud )
     {
+	if(frames_++ % skip_ != 0) return;
+
         tf::StampedTransform tr2;
         listener_.lookupTransform("base_link", cloud->header.frame_id, ros::Time(0), tr2);
 
@@ -119,6 +123,8 @@ class ChessPerception
     tf::TransformBroadcaster br_;
     tf::TransformListener listener_;
     tf::Transform board_to_base_;
+    unsigned int skip_;
+    unsigned int frames_;
 
     bool debug_;
 

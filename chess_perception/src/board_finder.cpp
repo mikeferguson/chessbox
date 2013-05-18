@@ -14,7 +14,7 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software Foundation,
-Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA 
+Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 **/
 
@@ -86,7 +86,7 @@ BoardFinder::BoardFinder()
 bool BoardFinder::findBoard(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
                             tf::Transform& board)
 {
-    /* Get an OpenCV image from the cloud 
+    /* Get an OpenCV image from the cloud
            TODO: update this code to be better/faster... */
     sensor_msgs::ImagePtr image_msg(new sensor_msgs::Image);
     pcl::toROSMsg (*cloud, *image_msg);
@@ -107,9 +107,9 @@ bool BoardFinder::findBoard(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
         const char* Di = bridge_->image.ptr<char>(i);
         char* Ii = src.ptr<char>(i);
         for(int j = 0; j < bridge_->image.cols; j++)
-        {   
+        {
             Ii[j+channel_] = Di[j*3+channel_];
-        }   
+        }
     }
 
     /* Threshold, erode/dilate to clean up image */
@@ -117,7 +117,7 @@ bool BoardFinder::findBoard(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
     cv::erode(src, src, cv::Mat());
     cv::dilate(src, src, cv::Mat());
     /* Edge detection, dilation before hough transform */
-    cv::Canny(src, dst, 30, 200, 3); 
+    cv::Canny(src, dst, 30, 200, 3);
     cv::dilate(dst, dst, cv::Mat());
 
     /* Do a hough transformation to find lines */
@@ -184,7 +184,7 @@ bool BoardFinder::findBoard(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
     {
         /* Convert back to color */
         cv::cvtColor(src, cdst, CV_GRAY2BGR);
-            
+
         /* Then blue/green for horizontal/vertical */
         ROS_DEBUG("horizontal lines: %d", (int) h_lines.size());
         for( size_t i = 0; i < h_lines.size(); i++ )
@@ -203,7 +203,7 @@ bool BoardFinder::findBoard(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
         }
     }
 
-    /* Get all (2d) intersections, which are proper corners */ 
+    /* Get all (2d) intersections, which are proper corners */
     std::vector<cv::Point> corner_points_2d;
     for( size_t i = 0; i < h_lines.size(); i++ )
     {
@@ -285,9 +285,6 @@ bool BoardFinder::findBoard(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
 
     ROS_DEBUG_STREAM("Board Finder: Found " << points.size() << " 3d points");
 
-    if(points.size() != 49) // point_threshold_)
-        return false;
-
     if(debug_)
     {
         bridge_->image = cdst;
@@ -295,6 +292,9 @@ bool BoardFinder::findBoard(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
         points.header = cloud->header;
         cloud_pub_.publish(points);
     }
+
+    if(points.size() != 49) // point_threshold_)
+        return false;
 
     /* estimate board/piece pose */
     pcl::PointCloud<pcl::PointXYZ> ideal;
@@ -319,7 +319,7 @@ bool BoardFinder::findBoard(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
 bool BoardFinder::accept(cv::Point& p, std::vector<cv::Point>& points)
 {
     for(size_t k = 0; k < points.size(); k++)
-    {   
+    {
         cv::Point tp = points[k];
         if( abs(tp.x-p.x) + abs(tp.y-p.y) < 7 )
             return false;
@@ -331,7 +331,7 @@ bool BoardFinder::accept(cv::Point& p, std::vector<cv::Point>& points)
 bool BoardFinder::accept_3d(pcl::PointXYZRGB& p, pcl::PointCloud<pcl::PointXYZRGB>& cloud)
 {
     for(size_t k = 0; k < cloud.size(); k++)
-    {   
+    {
         pcl::PointXYZRGB tp = cloud[k];
         if( fabs(tp.x-p.x) + fabs(tp.y-p.y) + fabs(tp.z-p.z) < 0.05 )
             return false;
@@ -350,7 +350,7 @@ cv::Point BoardFinder::findIntersection( cv::Vec4i a, cv::Vec4i b )
     double mb = (b[3]-b[1])/(double)(b[2]-b[0]);
     double ba = a[1] - ma*a[0];
     double bb = b[1] - mb*b[0];
-    
+
     double x = (bb-ba)/(ma-mb);
     double y = ma*x + ba;
 
