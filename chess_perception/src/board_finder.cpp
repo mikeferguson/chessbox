@@ -53,11 +53,13 @@ bool orderLinesH(const cv::Vec4i& a, const cv::Vec4i& b)
 
 BoardFinder::BoardFinder()
 {
-    /* TODO: load these from parameters */
-
     ros::NodeHandle nh ("~");
 
-    channel_ = 0; // blue
+    /* Load parameters */
+    if (!nh.getParam ("board_color", channel_))
+        channel_ = 0; // blue
+    if (!nh.getParam ("point_threshold", point_threshold_))
+        point_threshold_ = 43;
 
     /* Load parameters for hough transform */
     if (!nh.getParam ("h_rho", h_rho_))
@@ -69,8 +71,6 @@ BoardFinder::BoardFinder()
     if (!nh.getParam ("h_min_length", h_min_length_))
         h_min_length_ = 100;
     ROS_INFO ("Hough Min Length: %d", h_min_length_);
-
-    point_threshold_ = 43;
 
     debug_ = true;
 

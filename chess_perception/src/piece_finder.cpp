@@ -56,8 +56,10 @@ PieceFinder::PieceFinder()
 {
     ros::NodeHandle nh ("~");
 
-    /* TODO read params from parameter server */
     debug_ = true;
+
+    if (!nh.getParam ("color_threshold", threshold_))
+        point_threshold_ = 70;
 
     if(debug_)
     {
@@ -148,7 +150,7 @@ int PieceFinder::findPieces(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
         /* outputs */
         pcl::PointXYZ p(x,y,z);
         double weight = clusters[c].indices.size();
-        if(color < 100)
+        if(color < threshold_)
             weight = -weight; // use negative numbers for black
 
         /* check if cluster overlaps any other */

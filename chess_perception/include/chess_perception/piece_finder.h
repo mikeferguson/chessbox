@@ -50,6 +50,7 @@ class PieceFinder
     
   private:
     bool debug_;
+    int threshold_;
 
     pcl::ExtractPolygonalPrismData<pcl::PointXYZRGB> extract_data_;
     pcl::ExtractIndices<pcl::PointXYZRGB> extract_indices_;
