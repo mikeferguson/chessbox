@@ -54,6 +54,7 @@ class ChessExecutive:
         if self.sim:
             self.yourMove = self.yourMoveKeyboard
             self.board.side = self.board.WHITE
+            rospy.sleep(3.0)
         else:
             self.yourMove = self.yourMovePerception
             self.perception_times = list()
