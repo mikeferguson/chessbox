@@ -121,6 +121,7 @@ class ChessExecutive:
             self.updateBoardState(True)
         if self.board.side == None:
             self.board.computeSide()
+        self.board.setupSide()
 
         if self.board.side == self.board.BLACK:
             self.head.look_at_player()

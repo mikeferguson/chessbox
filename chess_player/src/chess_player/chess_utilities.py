@@ -179,32 +179,34 @@ class BoardState:
             self.side = self.WHITE   # good to go
         else:
             self.side = self.BLACK
-            # need to setup board
-            temp_board = BoardState(self.side)
-            for i in range(8):
-                temp_board.setPiece(i, 2, self.copyPiece(ChessPiece.WHITE_PAWN, self.getPiece(7-i, 7)) )
-                temp_board.setPiece(i, 7, self.copyPiece(ChessPiece.BLACK_PAWN, self.getPiece(7-i, 2)) )
 
-            temp_board.setPiece('a', 1, self.copyPiece(ChessPiece.WHITE_ROOK, self.getPiece('h',8)) )
-            temp_board.setPiece('b', 1, self.copyPiece(ChessPiece.WHITE_KNIGHT, self.getPiece('g',8)))
-            temp_board.setPiece('c', 1, self.copyPiece(ChessPiece.WHITE_BISHOP, self.getPiece('f',8)))
-            temp_board.setPiece('d', 1, self.copyPiece(ChessPiece.WHITE_QUEEN, self.getPiece('e',8)))
-            temp_board.setPiece('e', 1, self.copyPiece(ChessPiece.WHITE_KING, self.getPiece('d',8)))
-            temp_board.setPiece('f', 1, self.copyPiece(ChessPiece.WHITE_BISHOP, self.getPiece('c',8)))
-            temp_board.setPiece('g', 1, self.copyPiece(ChessPiece.WHITE_KNIGHT, self.getPiece('b',8)))
-            temp_board.setPiece('h', 1, self.copyPiece(ChessPiece.WHITE_ROOK, self.getPiece('a',8)))
+    def setupSide(self):
+        # need to setup board
+        temp_board = BoardState(self.side)
+        for i in range(8):
+            temp_board.setPiece(i, 2, self.copyPiece(ChessPiece.WHITE_PAWN, self.getPiece(7-i, 7)) )
+            temp_board.setPiece(i, 7, self.copyPiece(ChessPiece.BLACK_PAWN, self.getPiece(7-i, 2)) )
 
-            temp_board.setPiece('a', 8, self.copyPiece(ChessPiece.BLACK_ROOK, self.getPiece('h',1)) )
-            temp_board.setPiece('b', 8, self.copyPiece(ChessPiece.BLACK_KNIGHT, self.getPiece('g',1)) )
-            temp_board.setPiece('c', 8, self.copyPiece(ChessPiece.BLACK_BISHOP, self.getPiece('f',1)) )
-            temp_board.setPiece('d', 8, self.copyPiece(ChessPiece.BLACK_QUEEN, self.getPiece('e',1)) )
-            temp_board.setPiece('e', 8, self.copyPiece(ChessPiece.BLACK_KING, self.getPiece('d',1)) )
-            temp_board.setPiece('f', 8, self.copyPiece(ChessPiece.BLACK_BISHOP, self.getPiece('c',1)) )
-            temp_board.setPiece('g', 8, self.copyPiece(ChessPiece.BLACK_KNIGHT, self.getPiece('b',1)) )
-            temp_board.setPiece('h', 8, self.copyPiece(ChessPiece.BLACK_ROOK, self.getPiece('a',1)) )
+        temp_board.setPiece('a', 1, self.copyPiece(ChessPiece.WHITE_ROOK, self.getPiece('h',8)) )
+        temp_board.setPiece('b', 1, self.copyPiece(ChessPiece.WHITE_KNIGHT, self.getPiece('g',8)))
+        temp_board.setPiece('c', 1, self.copyPiece(ChessPiece.WHITE_BISHOP, self.getPiece('f',8)))
+        temp_board.setPiece('d', 1, self.copyPiece(ChessPiece.WHITE_QUEEN, self.getPiece('e',8)))
+        temp_board.setPiece('e', 1, self.copyPiece(ChessPiece.WHITE_KING, self.getPiece('d',8)))
+        temp_board.setPiece('f', 1, self.copyPiece(ChessPiece.WHITE_BISHOP, self.getPiece('c',8)))
+        temp_board.setPiece('g', 1, self.copyPiece(ChessPiece.WHITE_KNIGHT, self.getPiece('b',8)))
+        temp_board.setPiece('h', 1, self.copyPiece(ChessPiece.WHITE_ROOK, self.getPiece('a',8)))
 
-            self.values = temp_board.values
-            self.printBoard()
+        temp_board.setPiece('a', 8, self.copyPiece(ChessPiece.BLACK_ROOK, self.getPiece('h',1)) )
+        temp_board.setPiece('b', 8, self.copyPiece(ChessPiece.BLACK_KNIGHT, self.getPiece('g',1)) )
+        temp_board.setPiece('c', 8, self.copyPiece(ChessPiece.BLACK_BISHOP, self.getPiece('f',1)) )
+        temp_board.setPiece('d', 8, self.copyPiece(ChessPiece.BLACK_QUEEN, self.getPiece('e',1)) )
+        temp_board.setPiece('e', 8, self.copyPiece(ChessPiece.BLACK_KING, self.getPiece('d',1)) )
+        temp_board.setPiece('f', 8, self.copyPiece(ChessPiece.BLACK_BISHOP, self.getPiece('c',1)) )
+        temp_board.setPiece('g', 8, self.copyPiece(ChessPiece.BLACK_KNIGHT, self.getPiece('b',1)) )
+        temp_board.setPiece('h', 8, self.copyPiece(ChessPiece.BLACK_ROOK, self.getPiece('a',1)) )
+
+        self.values = temp_board.values
+        self.printBoard()
 
         self.last_move = "go"
 
@@ -257,7 +259,10 @@ class BoardState:
             return "q"
         elif piece_type == ChessPiece.BLACK_KING:
             return "k"
-        return "x"
+        elif piece_type > 0:
+            return "X"
+        else:
+            return "x"
 
     def getMoveText(self, move):
         print move
