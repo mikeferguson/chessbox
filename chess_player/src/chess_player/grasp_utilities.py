@@ -105,8 +105,8 @@ def getGrasps(pose_stamped):
     #g.allowed_touch_objects[] =
     yield g
     # now tilt the hand a bit, and rotate about yaw
-    for p in [0.05, 0.1, 0.2, -0.05, -0.1, 0.4, 0.7]:
-        for y in [-1.57, -0.78, 0.0, 0.78, 1.57]:
+    for y in [0.0, -.78, .78, -1.57, 1.57]:
+        for p in [0.0, 0.05, 0.1, 0.2, -0.5, -0.1, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
             q = quaternion_from_euler(0, 1.57-p, y)
             g.grasp_pose.pose.orientation.x = q[0]
             g.grasp_pose.pose.orientation.y = q[1]
@@ -114,6 +114,7 @@ def getGrasps(pose_stamped):
             g.grasp_pose.pose.orientation.w = q[3]
             g.id = str(p) + '+' + str(y)
             g.grasp_quality = 1.0 - (1.25 * p) - abs(y)/4.0
+            rospy.loginfo("pick %f, %f", p, y)
             #pub.publish(pa)
             yield g
 
@@ -133,14 +134,15 @@ def getPlaceLocations(pose_stamped):
     l.post_place_posture = getGripperPosture(GRIPPER_OPEN)
     yield l
     # now tilt the hand a bit, and rotate about yaw
-    for p in [0.05, 0.1, 0.2, -0.05, -0.1, 0.4, 0.7]:
-        for y in [-1.57, -0.78, 0.0, 0.78, 1.57]:
+    for y in [0.0, -.78, .78, -1.57, 1.57]:
+        for p in [0.0, 0.05, 0.1, 0.2, -0.5, -0.1, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
             q = quaternion_from_euler(0, 1.57-p, y)
             l.place_pose.pose.orientation.x = q[0]
             l.place_pose.pose.orientation.y = q[1]
             l.place_pose.pose.orientation.z = q[2]
             l.place_pose.pose.orientation.w = q[3]
             l.id = str(p) + '+' + str(y)
+            rospy.loginfo("place %f, %f", p, y)
             yield l
 
 class PickupManager:
