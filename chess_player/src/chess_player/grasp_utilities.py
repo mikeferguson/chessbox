@@ -54,6 +54,11 @@ PLAN_ONLY = False
 GRIPPER_CLOSED = 0.01
 GRIPPER_OPEN = 0.05
 
+# This is used for a capture
+OFF_BOARD_X = -SQUARE_SIZE
+OFF_BOARD_Y = -SQUARE_SIZE
+OFF_BOARD_Z = 0.10
+
 # Tucking the arm requires a set of joint constraints
 joint_names = ['arm_lift_joint', 'arm_shoulder_pan_joint', 'arm_upperarm_roll_joint', 'arm_shoulder_lift_joint', 'arm_elbow_flex_joint', 'arm_wrist_flex_joint', 'arm_wrist_roll_joint']
 joints_tucked  = [0.0, -1.57, 0.0, -1.7, 1.7, 1.57, -0.066472500808377785]
@@ -473,9 +478,9 @@ class ArmPlanner:
         if to != None:
             off_board = ChessPiece()
             off_board.header.frame_id = fr.header.frame_id
-            off_board.pose.position.x = -2 * SQUARE_SIZE
-            off_board.pose.position.y = SQUARE_SIZE
-            off_board.pose.position.z = fr.pose.position.z
+            off_board.pose.position.x = OFF_BOARD_X
+            off_board.pose.position.y = OFF_BOARD_Y
+            off_board.pose.position.z = OFF_BOARD_Z
             if not self.move_piece(to.pose, off_board.pose):
                 rospy.logerr('Failed to move captured piece')
                 self.success = False
