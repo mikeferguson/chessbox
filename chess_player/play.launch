@@ -1,5 +1,5 @@
 <launch>
-  <node pkg="chess_perception" type="chess_perception" name="chess_perception_node" respawn="true"/>
+  <node pkg="chess_perception" type="chess_perception" name="chess_perception_node" respawn="true" output="screen"/>
   <node pkg="chess_player" type="festival_launcher.py" name="launcher"/>
   <node pkg="chess_player" type="chess_executive.py" name="chess_executive" output="screen"/>
 </launch>

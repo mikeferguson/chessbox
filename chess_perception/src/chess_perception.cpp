@@ -71,7 +71,7 @@ class ChessPerception
         tf::Transform tr;
         if(!board_finder_.findBoard(cloud, tr))
         {
-            ROS_WARN("Unable to detect chess board.");
+            ROS_WARN_THROTTLE(1,"Unable to detect chess board.");
             return;
         }
         /* Update board estimate */
