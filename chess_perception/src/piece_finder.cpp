@@ -59,7 +59,7 @@ PieceFinder::PieceFinder()
     debug_ = true;
 
     if (!nh.getParam ("color_threshold", threshold_))
-        point_threshold_ = 70;
+        threshold_ = 70;
 
     if(debug_)
     {
