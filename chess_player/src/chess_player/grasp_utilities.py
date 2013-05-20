@@ -23,7 +23,7 @@ from __future__ import print_function
 import thread, copy, math
 import rospy
 import actionlib
-from math import sqrt
+from math import sqrt, atan2
 
 from tf.listener import *
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
@@ -86,11 +86,39 @@ def getGripperTranslation(min_dist, desired, axis=1.0):
     gt.desired_distance = desired
     return gt
 
+def getY(start):
+    y = [0.0, -.78, .78, -1.57, 1.57]
+    sent = list()
+    while len(y) > len(sent):
+        c = 0
+        dist = 100
+        for i in y:
+            if not i in sent:
+                if abs(i-start) < dist:
+                    dist = abs(i-start)
+                    c = i
+        sent.append(c)
+        yield c
+
+def getP(start):
+    p = [0.0, 0.05, 0.1, 0.2, -0.5, -0.1, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+    sent = list()
+    while len(p) > len(sent):
+        c = 0
+        dist = 100
+        for i in p:
+            if not i in sent:
+                if abs(i-start) < dist:
+                    dist = abs(i-start)
+                    c = i
+        sent.append(c)
+        yield c
+
 # TODO: all this generator crap was created before changing approach frame to
 #       gripper_link -- at some point, should see if we can remove it all and just
 #       pass a list of grasps to moveit (previously, it crashed with an Eigen error
 #       and I just didn't have time to fix it)
-def getGrasps(pose_stamped):
+def getGrasps(pose_stamped): #, y_start = 0.0, p_start = 0.0):
     """ Returns an iterator of increasingly worse grasps. """
     g = Grasp()
     # directly overhead first
@@ -98,20 +126,25 @@ def getGrasps(pose_stamped):
     g.pre_grasp_posture = getGripperPosture(GRIPPER_OPEN)
     g.grasp_posture = getGripperPosture(GRIPPER_CLOSED)
     g.grasp_pose = pose_stamped
-    q = quaternion_from_euler(0, 1.57, 0)
-    g.grasp_pose.pose.orientation.x = q[0]
-    g.grasp_pose.pose.orientation.y = q[1]
-    g.grasp_pose.pose.orientation.z = q[2]
-    g.grasp_pose.pose.orientation.w = q[3]
-    g.grasp_quality = 1.0
+#    q = quaternion_from_euler(0, 1.57, 0)
+#    g.grasp_pose.pose.orientation.x = q[0]
+#    g.grasp_pose.pose.orientation.y = q[1]
+#    g.grasp_pose.pose.orientation.z = q[2]
+#    g.grasp_pose.pose.orientation.w = q[3]
+#    g.grasp_quality = 1.0
     g.approach = getGripperTranslation(0.05, 0.15)
     g.retreat = getGripperTranslation(0.05, 0.15, -1.0)
     #g.max_contact_force =
     #g.allowed_touch_objects[] =
-    yield g
+#    yield g
+    print(pose_stamped.pose)
+    diag = ((pose_stamped.pose.position.x**2) + (pose_stamped.pose.position.y**2)) ** 0.5
+    p_start = (diag-0.22)*4 #(pose_stamped.pose.position.y) * 5.0
+    y_start = atan2(pose_stamped.pose.position.y, pose_stamped.pose.position.x - 0.055) * -1.3 #(pose_stamped.pose.position.x - .2) * 0.9
+    print("p/y: %f, %f" % (p_start, y_start))
     # now tilt the hand a bit, and rotate about yaw
-    for y in [0.0, -.78, .78, -1.57, 1.57]:
-        for p in [0.0, 0.05, 0.1, 0.2, -0.5, -0.1, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
+    for y in getY(y_start): # [0.0, -.78, .78, -1.57, 1.57]:
+        for p in getP(p_start): #[0.0, 0.05, 0.1, 0.2, -0.5, -0.1, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
             q = quaternion_from_euler(0, 1.57-p, y)
             g.grasp_pose.pose.orientation.x = q[0]
             g.grasp_pose.pose.orientation.y = q[1]
@@ -129,18 +162,23 @@ def getPlaceLocations(pose_stamped):
     # directly overhead first
     l.id = 'direct_overhead'
     l.place_pose = pose_stamped
-    q = quaternion_from_euler(0, 1.57, 0)
-    l.place_pose.pose.orientation.x = q[0]
-    l.place_pose.pose.orientation.y = q[1]
-    l.place_pose.pose.orientation.z = q[2]
-    l.place_pose.pose.orientation.w = q[3]
+#   q = quaternion_from_euler(0, 1.57, 0)
+#   l.place_pose.pose.orientation.x = q[0]
+#   l.place_pose.pose.orientation.y = q[1]
+#   l.place_pose.pose.orientation.z = q[2]
+#   l.place_pose.pose.orientation.w = q[3]
     l.approach = getGripperTranslation(0.05, 0.15)
     l.retreat = getGripperTranslation(0.05, 0.15, -1.0)
     l.post_place_posture = getGripperPosture(GRIPPER_OPEN)
-    yield l
+#    yield l
+    print(pose_stamped.pose)
+    diag = ((pose_stamped.pose.position.x**2) + (pose_stamped.pose.position.y**2)) ** 0.5
+    p_start = (diag-0.22)*4 #(pose_stamped.pose.position.y) * 5.0
+    y_start = atan2(pose_stamped.pose.position.y, pose_stamped.pose.position.x - 0.055) * -1.3 #(pose_stamped.pose.position.x - .2) * 0.9
+    print("p/y: %f, %f" % (p_start, y_start))
     # now tilt the hand a bit, and rotate about yaw
-    for y in [0.0, -.78, .78, -1.57, 1.57]:
-        for p in [0.0, 0.05, 0.1, 0.2, -0.5, -0.1, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
+    for y in getY(y_start): # [0.0, -.78, .78, -1.57, 1.57]:
+        for p in getP(p_start): #[0.0, 0.05, 0.1, 0.2, -0.5, -0.1, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
             q = quaternion_from_euler(0, 1.57-p, y)
             l.place_pose.pose.orientation.x = q[0]
             l.place_pose.pose.orientation.y = q[1]
@@ -535,6 +573,32 @@ class ArmPlanner:
         self._move.moveToJointPosition(joint_names, joints_untucked)
 
 if __name__=='__main__':
+    # c5
+    #x = 0.361600745133
+    #y = -0.0966900045251
+
+    # c7
+    #x = 0.23
+    #y = -0.08
+
+    #d7
+    x = 0.23
+    y = 0.032
+
+    diag = ((x**2) + (y**2)) ** 0.5
+    #y_start = (diag-0.22)*4 #(pose_stamped.pose.position.y) * 5.0
+    #p_start = atan2(y, x - 0.055) * -1.3 #(pose_stamped.pose.position.x - .2) * 0.9
+    y_start = atan2(y, x - 0.055) * -1.3
+    p_start = (diag-0.22)*4
+
+    print("p/y: %f, %f" % (p_start, y_start))
+
+    for y in getY(y_start): # [0.0, -.78, .78, -1.57, 1.57]:
+        for p in getP(p_start): #[0.0, 0.05, 0.1, 0.2, -0.5, -0.1, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
+            print("%f, %f" % (p,y))
+
+    exit()
+
     rospy.init_node('grasp_utilities')
     pick = PickupManager('Arm', 'Gripper')
     place = PlaceManager('Arm', 'Gripper')
