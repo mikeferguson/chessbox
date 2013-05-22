@@ -573,32 +573,6 @@ class ArmPlanner:
         self._move.moveToJointPosition(joint_names, joints_untucked)
 
 if __name__=='__main__':
-    # c5
-    #x = 0.361600745133
-    #y = -0.0966900045251
-
-    # c7
-    #x = 0.23
-    #y = -0.08
-
-    #d7
-    x = 0.23
-    y = 0.032
-
-    diag = ((x**2) + (y**2)) ** 0.5
-    #y_start = (diag-0.22)*4 #(pose_stamped.pose.position.y) * 5.0
-    #p_start = atan2(y, x - 0.055) * -1.3 #(pose_stamped.pose.position.x - .2) * 0.9
-    y_start = atan2(y, x - 0.055) * -1.3
-    p_start = (diag-0.22)*4
-
-    print("p/y: %f, %f" % (p_start, y_start))
-
-    for y in getY(y_start): # [0.0, -.78, .78, -1.57, 1.57]:
-        for p in getP(p_start): #[0.0, 0.05, 0.1, 0.2, -0.5, -0.1, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
-            print("%f, %f" % (p,y))
-
-    exit()
-
     rospy.init_node('grasp_utilities')
     pick = PickupManager('Arm', 'Gripper')
     place = PlaceManager('Arm', 'Gripper')
@@ -637,7 +611,7 @@ if __name__=='__main__':
 
     ####################################################
     # this was the original testing code
-    if 0:
+    if 1:
         # remove old pieces/table if any
         obj.remove('part')
         obj.remove('table')
@@ -645,7 +619,7 @@ if __name__=='__main__':
             for x in range(8):
                 obj.remove(chr(97+x)+str(y+1))
 
-    if 0:
+    if 1:
         # add table
         p = PoseStamped()
         p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
@@ -663,7 +637,7 @@ if __name__=='__main__':
         obj.addBox('table', 0.05715 * 8, 0.05715 * 8, .1, p_transformed.pose.position.x, p_transformed.pose.position.y, p_transformed.pose.position.z)
         p.pose.position.z = 0
 
-    if 0:
+    if 1:
         # add pieces
         for y in [0,1,6,7]:
             for x in range(8):
@@ -674,16 +648,22 @@ if __name__=='__main__':
                 p_transformed = listener.transformPose(FIXED_FRAME, p)
                 obj.addCube(chr(97+x)+str(y+1), 0.015, p_transformed.pose.position.x, p_transformed.pose.position.y, p_transformed.pose.position.z)
 
-    if 0:
-        # manipulate a part
-        p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
-        p.pose.position.x = SQUARE_SIZE * (0.5 + 4)
-        p.pose.position.y = SQUARE_SIZE * (0.5 + 1)
-        p_transformed = listener.transformPose(FIXED_FRAME, p)
+    if 1:
+        i = 0
+        for col in 'abcdefgh':
+            # manipulate a part
+            p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
+            p.pose.position.x = SQUARE_SIZE * (0.5 + i)
+            p.pose.position.y = SQUARE_SIZE * (0.5 + 1)
+            p_transformed = listener.transformPose(FIXED_FRAME, p)
 
-        pick.pickup('e2', p_transformed)
-        rospy.sleep(1.0)
+            pick.pickup(col+"2", p_transformed)
+            rospy.sleep(1.0)
 
-        p_transformed.pose.position.x += SQUARE_SIZE*2
-        place.place('e2', p_transformed)
+            p_transformed.pose.position.x += SQUARE_SIZE*2
+            place.place(col+"2", p_transformed)
+
+            move.moveToJointPosition(joint_names, joints_untucked)
+            rospy.sleep(1)
+            i+=1
 
