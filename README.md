@@ -36,14 +36,50 @@ You can startup most of the pipeline without having a Maxwell:
     roslaunch maxwell_moveit_config move_group.launch
     rosrun tf static_transform_publisher .15 .2286 .7366 -1.57 0 0 base_link chess_board 20
 
-You probably want to view things. So "rosrun rviz rviz". Be sure to add a PlanningScene display, and set the Planning Scene topic to "move_group/monitored_planning_scene". You can then run through some tests. For instance, it's nice to tuck the arm (it will start up pointing straight out):
+You probably want to view things. So "rosrun rviz rviz". Be sure to add a PlanningScene display, and set
+the Planning Scene topic to "move_group/monitored_planning_scene". You can then run through some tests.
+For instance, it's nice to tuck the arm (it will start up pointing straight out):
 
     rosrun chess_player tuck_arm.py
 
-The next test is to move all pawns forward 2 steps. You should be able to watch the chess board be created, a bunch of little blocks be inserted, and then all of the "pawns" be moved forward. Startup may take some time:
+The next test is to move all pawns forward 2 steps. You should be able to watch the chess board be created,
+a bunch of little blocks be inserted, and then all of the "pawns" be moved forward. Startup may take some time:
 
     rosrun chess_player grasp_utilities.py
 
-Finally, you *might* be able to run the full executive and have the robot move some pieces, but this does get broken from time to time:
+Finally, you *might* be able to run the full executive and have the robot move some pieces, but this does get
+broken from time to time:
 
     rosrun chess_player chess_executive.py --sim
+
+## Adapting to a new robot
+Much of this code is robot-independent.
+
+### chess_perception
+The only robot-related aspect is that the head should be pointed at the board, and that the *base_link* is
+currently hard-coded as the frame to which we should cache the board transform in. This could easily be made
+into a parameter.
+
+The other major issue is that the perception code currently requires all 49 "inner points" on the chess board
+to be visible -- this isn't possible if the camera is at too low of an angle and obstructed by pieces. This
+really should be updated to be more robust.
+
+### chess_player/src/head_utilities.py
+This is currently hard coded with angles for Maxwell. Ideally this would eventually turn into a point_head
+action, with a "search and then cache" function for "looking at the board".
+
+### chess_player/src/grasp_utilities.py
+There are a number of parameters and hacks still in here. GRIPPER_FRAME, FIXED_FRAME, etc should probably
+become parameters. Something should be done with OFF_BOARD positions used for capture. Gripper stuff should
+be better....
+
+The functions for getGripperPosture, getGripperTranslation, and all of the grasp generation stuff (getY, getP,
+getGrasps, getPlaceLocations) are Maxwell-specific, although if your arm is *pretty good* at overhead grasps
+this may just work for you.
+
+### chess_player/nodes/tuck_arm.py
+This just calls grasp_utilities.py. Obviously, this is currently hard-coded with the tuck positions of
+Maxwell. Ideally we would load the tuck position from the SRDF file to make this robot-independent.
+
+### chess_player/nodes/tilt_head.py
+This calls head_utility.py stuff.
