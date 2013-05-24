@@ -663,7 +663,7 @@ if __name__=='__main__':
             p_transformed.pose.position.x += SQUARE_SIZE*2
             place.place(col+"2", p_transformed)
 
-            move.moveToJointPosition(joint_names, joints_untucked)
+            move.moveToJointPosition(joint_names, joints_tucked)
             rospy.sleep(1)
             i+=1
 
