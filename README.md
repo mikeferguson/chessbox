@@ -4,9 +4,9 @@ This is the n-th generation chess code, which was originally developed for AAAI 
 
 ## Installation
 
-    sudo apt-get install gnuchess gnuchess-book
-    sudo apt-get install festlex-cmu ros-groovy-sound-drivers
-    sudo apt-get install python-pexpect ros-groovy-moveit-full
+    sudo apt-get install gnuchess gnuchess-book python-pexpect
+    sudo apt-get install festlex-cmu ros-groovy-audio-common
+    sudo apt-get install ros-groovy-moveit-full
 
     cd <catkin_ws>/src
     wstool init
