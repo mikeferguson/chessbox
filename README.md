@@ -53,7 +53,8 @@ broken from time to time:
     rosrun chess_player chess_executive.py --sim
 
 ## Adapting to a new robot
-Much of this code is robot-independent.
+Much of this code is robot-independent. Below I list the files known not to be (in other words, if the file
+isn't in this list, it is probably robot-independent).
 
 ### chess_perception
 The only robot-related aspect is that the head should be pointed at the board, and that the *base_link* is
