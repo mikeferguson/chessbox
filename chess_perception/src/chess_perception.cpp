@@ -58,7 +58,7 @@ class ChessPerception
     /** \brief Main loop */
     void cameraCallback ( pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud )
     {
-	if(frames_++ % skip_ != 0) return;
+        if(frames_++ % skip_ != 0) return;
 
         tf::StampedTransform tr2;
         listener_.lookupTransform("base_link", cloud->header.frame_id, ros::Time(0), tr2);
