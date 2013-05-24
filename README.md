@@ -6,6 +6,7 @@ This is the n-th generation chess code, which was originally developed for AAAI 
 
     sudo apt-get install gnuchess gnuchess-book
     sudo apt-get install festlex-cmu ros-groovy-sound-drivers
+    sudo apt-get install python-pexpect ros-groovy-moveit-full
 
     cd <catkin_ws>/src
     wstool init
@@ -21,7 +22,7 @@ This is the n-th generation chess code, which was originally developed for AAAI 
     sudo tar jxf cmu_us_awb_arctic-0.95-release.tar.bz2 
     sudo ln -s cmu_us_awb_arctic cmu_us_awb_arctic_clunits
 
-## Running
+## Running on Maxwell -- pretty much only I can do this...
 
     roslaunch maxwell_defs bringup_maxwell.launch
     roslaunch maxwell_defs head_camera.launch
