@@ -179,7 +179,7 @@ def getPlaceLocations(pose_stamped):
     # now tilt the hand a bit, and rotate about yaw
     for y in getY(y_start): # [0.0, -.78, .78, -1.57, 1.57]:
         for p in getP(p_start): #[0.0, 0.05, 0.1, 0.2, -0.5, -0.1, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
-            q = quaternion_from_euler(0, 1.57-p, y)
+            q = quaternion_from_euler(0, p, y) # place is in terms of object coordinate frame, not gripper
             l.place_pose.pose.orientation.x = q[0]
             l.place_pose.pose.orientation.y = q[1]
             l.place_pose.pose.orientation.z = q[2]
