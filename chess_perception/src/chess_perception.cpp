@@ -38,8 +38,6 @@ Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 class ChessPerception
 {
   public:
-    static const int square_size = 0.05715;
-
     ChessPerception(ros::NodeHandle & n): nh_ (n)
     {
         frames_ = 0;
