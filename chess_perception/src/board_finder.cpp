@@ -21,6 +21,7 @@ Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #include <chess_perception/board_finder.h>
 
 #include <ros/ros.h>
+#include <math.h>
 
 /** \brief Helper function to convert Eigen transformation to tf -- thanks to Garret Gallagher */
 tf::Transform tfFromEigen(Eigen::Matrix4f trans)
@@ -51,6 +52,12 @@ bool orderLinesH(const cv::Vec4i& a, const cv::Vec4i& b)
     return ba > bb;
 }
 
+/** Used to determine distance between two points */
+double point_distance(pcl::PointXYZRGB p1, pcl::PointXYZRGB p2)
+{
+    return sqrt(pow(p1.z - p2.z, 2) + pow(p1.x - p2.x, 2) + pow(p1.y - p2.y, 2));
+}
+
 BoardFinder::BoardFinder()
 {
     ros::NodeHandle nh ("~");
@@ -59,7 +66,7 @@ BoardFinder::BoardFinder()
     if (!nh.getParam ("board_color", channel_))
         channel_ = 0; // blue
     if (!nh.getParam ("point_threshold", point_threshold_))
-        point_threshold_ = 43;
+        point_threshold_ = 42;
 
     /* Load parameters for hough transform */
     if (!nh.getParam ("h_rho", h_rho_))
@@ -86,8 +93,7 @@ BoardFinder::BoardFinder()
 bool BoardFinder::findBoard(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
                             tf::Transform& board)
 {
-    /* Get an OpenCV image from the cloud
-           TODO: update this code to be better/faster... */
+    /* Get an OpenCV image from the cloud */
     sensor_msgs::ImagePtr image_msg(new sensor_msgs::Image);
     pcl::toROSMsg (*cloud, *image_msg);
     try
@@ -204,7 +210,7 @@ bool BoardFinder::findBoard(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
     }
 
     /* Get all (2d) intersections, which are proper corners */
-    std::vector<cv::Point> corner_points_2d;
+    std::vector< std::vector<cv::Point> > corner_points_2d;
     for( size_t i = 0; i < h_lines.size(); i++ )
     {
         cv::Vec4i hl = h_lines[i];
@@ -248,40 +254,59 @@ bool BoardFinder::findBoard(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
                 {
                     /* Draw circles */
                     cv::circle( cdst, p, 5, cv::Scalar(255,0,0), -1 );
-                    //ROS_INFO_STREAM(p.x << "," << p.y);
                 }
             }
         }
         if(temp_lines.size() > 5)
         {
             std::stable_sort(temp_lines.begin(), temp_lines.end(), orderPointsX);
-            for(size_t k = 0; k < temp_lines.size(); k++)
-            {
-                corner_points_2d.push_back(temp_lines[k]);
-            }
+            corner_points_2d.push_back(temp_lines);
         }
     }
 
-    ROS_DEBUG_STREAM("Board Finder: Found " << corner_points_2d.size() << " 2d points");
-
-    if(corner_points_2d.size() < point_threshold_)
+    /* We need some data from each row */
+    if(corner_points_2d.size() < 7)
+    {
+        ROS_WARN("Board Finder: Missing an entire row");
         return false;
+    }
 
-    /* Project to 3d */
+    /* Project to 3d, try to handle missing points in center of row */
+    int corner_indices[7][7];
+    for ( size_t i = 0; i < 7; i++ )
+        for ( size_t j = 0; j < 7; j++)
+            corner_indices[i][j] = -1;
     pcl::PointCloud<pcl::PointXYZRGB> points;
     for ( size_t i = 0; i < corner_points_2d.size(); i++ )
     {
-        cv::Point p2d = corner_points_2d[i];
-        pcl::PointXYZRGB p3d = (*cloud)(p2d.x, p2d.y);
-        if( !isnan(p3d.x) && !isnan(p3d.y) && !isnan(p3d.z) )
+        int j_offset = 0;
+        for ( size_t j = 0; j < corner_points_2d[i].size(); j++)
         {
-            if( accept_3d(p3d, points) )
+            cv::Point p2d = corner_points_2d[i][j];
+            pcl::PointXYZRGB p3d = (*cloud)(p2d.x, p2d.y);
+            if( !isnan(p3d.x) && !isnan(p3d.y) && !isnan(p3d.z) )
             {
-                points.push_back( p3d );
+                if( accept_3d(p3d, points) )
+                {
+                    points.push_back( p3d );
+                    /* insert index */
+                    if ( j > 0 )
+                    {
+                        if ( point_distance(p3d, points[points.size()-2]) > (square_size_ * 1.3) )
+                            j_offset += (int) (point_distance(p3d, points[points.size()-2])/ square_size_) - 0.5;
+                        corner_indices[i][j+j_offset] = points.size() - 1;
+                    }
+                    else
+                        corner_indices[i][j+j_offset] = points.size() - 1;
+                }
+                else
+                    j_offset--;
             }
+            // TODO: add some means of searching for a point near here that is not a nan.
         }
-        // TODO: add some means of searching for a point near here that is not a nan.
     }
+
+    // TODO: handle missing points at the beginning of a row
 
     ROS_DEBUG_STREAM("Board Finder: Found " << points.size() << " 3d points");
 
@@ -293,18 +318,25 @@ bool BoardFinder::findBoard(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
         cloud_pub_.publish(points);
     }
 
-    if(points.size() != 49) // point_threshold_)
+    if(points.size() < point_threshold_)
         return false;
 
-    /* estimate board/piece pose */
+    /* Estimate board/piece pose */
     pcl::PointCloud<pcl::PointXYZ> ideal;
     for(int h = 1; h < 8; h++)
     {
         for(int v = 1; v < 8; v++)
         {
-            /* TODO: make this work without exactly the 49 points */
-            ideal.push_back(pcl::PointXYZ(0.05715*v,0.05715*h,0));
+            if( corner_indices[h-1][v-1] >= 0 )
+                ideal.push_back(pcl::PointXYZ(square_size_*v,square_size_*h,0));
         }
+    }
+
+    /* Occasionally, we hit this, mainly due to motion. */
+    if ( points.size() != ideal.size() )
+    {
+        ROS_WARN_STREAM("Board Finder: Failed size check: " << points.size() << " vs " << ideal.size());
+        return false;
     }
 
     Eigen::Matrix4f t;
