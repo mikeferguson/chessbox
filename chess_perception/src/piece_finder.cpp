@@ -69,9 +69,9 @@ PieceFinder::PieceFinder()
     /* Setup an untransformed hull */
     pcl::PointXYZRGB p;
     hull_untransformed_.push_back(p);
-    p.x = 0.05715 * 8;
+    p.x = square_size_ * 8;
     hull_untransformed_.push_back(p);
-    p.y = 0.05715 * 8;
+    p.y = square_size_ * 8;
     hull_untransformed_.push_back(p);
     p.x = 0;
     hull_untransformed_.push_back(p);
@@ -154,7 +154,7 @@ int PieceFinder::findPieces(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
             weight = -weight; // use negative numbers for black
 
         /* check if cluster overlaps any other */
-        int index = (int)(x/0.05715) + 8 * (int)(y/0.05715);
+        int index = (int)(x/square_size_) + 8 * (int)(y/square_size_);
         if(cluster_index[index].size() == 0)
         {
             /* is new */
