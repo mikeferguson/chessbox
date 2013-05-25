@@ -59,11 +59,8 @@ isn't in this list, it is probably robot-independent).
 ### chess_perception
 The only robot-related aspect is that the head should be pointed at the board, and that the *base_link* is
 currently hard-coded as the frame to which we should cache the board transform in. This could easily be made
-into a parameter.
-
-The other major issue is that the perception code currently requires all 49 "inner points" on the chess board
-to be visible -- this isn't possible if the camera is at too low of an angle and obstructed by pieces. This
-really should be updated to be more robust.
+into a parameter. The other major issue is that the perception code currently is not entirely robust to
+pieces being improperly placed on the board.
 
 ### chess_player/src/head_utilities.py
 This is currently hard coded with angles for Maxwell. Ideally this would eventually turn into a point_head
