@@ -40,26 +40,30 @@ class ChessPerception
   public:
     ChessPerception(ros::NodeHandle & n): nh_ (n)
     {
+        /* Initialize cached data to something reasonable */
+        board_to_fixed_.setIdentity();
         frames_ = 0;
         debug_ = true;
-        board_to_base_.setIdentity();
 
-        ros::NodeHandle nh ("~");
-
-        /* Load Parameters */
+        /* Load global parameters */
         double square_size;
         if (!n.getParam ("chess_square_size", square_size))
             square_size = 0.05715;
         board_finder_.setSquareSize(square_size);
         piece_finder_.setSquareSize(square_size);
+
+        /* Load local parameters */
+        ros::NodeHandle nh ("~");
         if (!nh.getParam ("skip", skip_))
             skip_ = 2;
+        if (!nh.getParam ("fixed_frame", fixed_frame_))
+            fixed_frame_ = "base_link";
 
         /* Subscribe to just the cloud now */
         cloud_sub_ = nh_.subscribe("/camera/depth_registered/points", 1, &ChessPerception::cameraCallback, this);
         output_ = nh_.advertise<chess_msgs::ChessBoard>("chess_board_state", 1);
 
-        /* periodic callback to publish tf */
+        /* Periodic callback to publish tf */
         publish_timer_ = nh_.createWallTimer(ros::WallDuration(1.0/30.0), boost::bind(&ChessPerception::publishCallback, this, _1));
     }
 
@@ -69,7 +73,7 @@ class ChessPerception
         if(frames_++ % skip_ != 0) return;
 
         tf::StampedTransform tr2;
-        listener_.lookupTransform("base_link", cloud->header.frame_id, ros::Time(0), tr2);
+        listener_.lookupTransform(fixed_frame_, cloud->header.frame_id, ros::Time(0), tr2);
 
         /* Find potential corner points of board.
          * This is a mostly 2d-operation that is quite fast, but somewhat unreliable.
@@ -83,7 +87,7 @@ class ChessPerception
             return;
         }
         /* Update board estimate */
-        board_to_base_ = tr2 * tr;
+        board_to_fixed_ = tr2 * tr;
 
         /* Find potential centroids/colors of pieces */
         std::vector<pcl::PointXYZ> pieces;
@@ -94,7 +98,8 @@ class ChessPerception
             ROS_WARN_THROTTLE(1,"Unable to detect pieces.");
             return;
         }
-        ROS_INFO_STREAM("Found " << piece_count << " pieces.");
+        ROS_DEBUG_STREAM("Found " << piece_count << " pieces.");
+
         /* Publish piece estimate */
         chess_msgs::ChessBoard cb;
         for (size_t i = 0; i < piece_count; i++)
@@ -117,11 +122,11 @@ class ChessPerception
     /** \brief Periodic callback to publish tf data */
     void publishCallback(const ros::WallTimerEvent& event)
     {
-        br_.sendTransform(tf::StampedTransform(board_to_base_, ros::Time::now(), "base_link", "chess_board"));
+        br_.sendTransform(tf::StampedTransform(board_to_fixed_, ros::Time::now(), fixed_frame_, "chess_board"));
     }
 
   private:
-    /* node handles, subscribers, publishers, etc */
+    /* Node handles, subscribers, publishers, etc */
     ros::NodeHandle nh_;
     ros::Subscriber cloud_sub_;
     ros::Publisher cloud_pub_;
@@ -130,13 +135,17 @@ class ChessPerception
     ros::WallTimer publish_timer_;
     tf::TransformBroadcaster br_;
     tf::TransformListener listener_;
-    tf::Transform board_to_base_;
+
+    /* The frame to cache and republish in (typically "base_link") */
+    std::string fixed_frame_;
+    /* The actual cached transform to publish */
+    tf::Transform board_to_fixed_;
+
     int skip_;
     unsigned int frames_;
-
     bool debug_;
 
-    /* smarts */
+    /* Smarts */
     BoardFinder board_finder_;
     PieceFinder piece_finder_;
 };
