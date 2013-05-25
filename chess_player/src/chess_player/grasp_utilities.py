@@ -318,13 +318,13 @@ class MotionManager:
         s.dimensions = [0.0001]
         s.type = s.SPHERE
         b.primitives.append(s)
-        b.primitive_poses.append(goal_transformed.pose)
+        b.primitive_poses.append(pose_transformed.pose)
         c1.position_constraints[0].constraint_region = b
         c1.position_constraints[0].weight = 1.0
 
         c1.orientation_constraints.append(OrientationConstraint())
         c1.orientation_constraints[0].header.frame_id = self._fixed_frame
-        c1.orientation_constraints[0].orientation = goal_transformed.pose.orientation
+        c1.orientation_constraints[0].orientation = pose_transformed.pose.orientation
         c1.orientation_constraints[0].link_name = GRIPPER_FRAME
         c1.orientation_constraints[0].absolute_x_axis_tolerance = 1.0
         c1.orientation_constraints[0].absolute_y_axis_tolerance = 1.0
