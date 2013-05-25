@@ -1,5 +1,12 @@
 <launch>
+
   <node pkg="chess_perception" type="chess_perception" name="chess_perception_node" respawn="true" output="screen"/>
+
   <node pkg="chess_player" type="festival_launcher.py" name="launcher"/>
-  <node pkg="chess_player" type="chess_executive.py" name="chess_executive" output="screen"/>
+
+  <node pkg="chess_player" type="chess_executive.py" name="chess_executive" output="screen">
+    <param name="board_color" value="0"/><!-- blue = 0, green = 1, red = 2 -->
+    <param name="chess_square_size" value="0.05715">
+  </node>
+
 </launch>
