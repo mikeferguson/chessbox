@@ -46,6 +46,9 @@ class BoardFinder
     bool findBoard(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
                    tf::Transform& board);
 
+    /** \brief Set the size of a square on our chess board. */
+    void setSquareSize(double size) { square_size_ = size; }
+
   private:
     /** \brief Helper function to decide whether to accept a point */
     bool accept(cv::Point& p, std::vector<cv::Point>& points);
@@ -66,6 +69,9 @@ class BoardFinder
 
     /* parameters for point detection */
     int point_threshold_;
+
+    /* board parameters -- the size of a square */
+    double square_size_;
 
     /* configuration */
     bool debug_;

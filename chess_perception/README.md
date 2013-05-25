@@ -14,6 +14,5 @@ Is now a single node, finds board and pieces. Sub-modules include:
 Future Improvements
  * make board_finder robust to missing/added intersections
  * improve board_finder intersection acceptance test
- * load parameters from param server
  * take into account expected board state (from player node)
  * piece_finder should ignore any cluster that is physically too large to be a piece

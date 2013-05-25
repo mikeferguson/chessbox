@@ -42,10 +42,20 @@ class ChessPerception
 
     ChessPerception(ros::NodeHandle & n): nh_ (n)
     {
-        debug_ = true;
-        skip_ = 2;
-        board_to_base_.setIdentity();
         frames_ = 0;
+        debug_ = true;
+        board_to_base_.setIdentity();
+
+        ros::NodeHandle nh ("~");
+
+        /* Load Parameters */
+        double square_size;
+        if (!n.getParam ("chess_square_size", square_size))
+            square_size = 0.05715;
+        board_finder_.setSquareSize(square_size);
+        piece_finder_.setSquareSize(square_size);
+        if (!nh.getParam ("skip", skip_))
+            skip_ = 2;
 
         /* Subscribe to just the cloud now */
         cloud_sub_ = nh_.subscribe("/camera/depth_registered/points", 1, &ChessPerception::cameraCallback, this);
@@ -83,7 +93,7 @@ class ChessPerception
         int piece_count = piece_finder_.findPieces(cloud, tr, pieces, weights);
         if(piece_count == 0)
         {
-            ROS_ERROR("Unable to detect pieces.");
+            ROS_WARN_THROTTLE(1,"Unable to detect pieces.");
             return;
         }
         ROS_INFO_STREAM("Found " << piece_count << " pieces.");
@@ -123,7 +133,7 @@ class ChessPerception
     tf::TransformBroadcaster br_;
     tf::TransformListener listener_;
     tf::Transform board_to_base_;
-    unsigned int skip_;
+    int skip_;
     unsigned int frames_;
 
     bool debug_;

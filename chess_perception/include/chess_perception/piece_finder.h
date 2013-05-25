@@ -47,10 +47,14 @@ class PieceFinder
                    tf::Transform& board_transform,
                    std::vector<pcl::PointXYZ>& pieces,
                    std::vector<double>& weights);
-    
+
+    /** \brief Set the size of a square on our chess board. */
+    void setSquareSize(double size) { square_size_ = size; }
+
   private:
     bool debug_;
     int threshold_;
+    double square_size_;
 
     pcl::ExtractPolygonalPrismData<pcl::PointXYZRGB> extract_data_;
     pcl::ExtractIndices<pcl::PointXYZRGB> extract_indices_;
