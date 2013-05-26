@@ -38,31 +38,15 @@ from moveit_msgs.msg import AttachedCollisionObject, CollisionObject, PlanningSc
 from manipulation_msgs.msg import Grasp, GripperTranslation, PlaceLocation
 
 from chess_utilities import SQUARE_SIZE, castling_extras
-
-# The frame used for approach and retreat translations, gripper_link is local
-#   so approach/translation gets transformed by the grasp orientation
-GRIPPER_FRAME = 'gripper_link'
-
-# The frame that all objects/poses should be translated to, the frame in which
-#   moveit planning is done
-FIXED_FRAME = 'base_link'
+from robot_defs import *
 
 # Should we only plan, and not execute?
 PLAN_ONLY = False
-
-# This was previously 0.0075
-GRIPPER_CLOSED = 0.01
-GRIPPER_OPEN = 0.05
 
 # This is used for a capture
 OFF_BOARD_X = -SQUARE_SIZE
 OFF_BOARD_Y = -SQUARE_SIZE
 OFF_BOARD_Z = 0.10
-
-# Tucking the arm requires a set of joint constraints
-joint_names = ['arm_lift_joint', 'arm_shoulder_pan_joint', 'arm_upperarm_roll_joint', 'arm_shoulder_lift_joint', 'arm_elbow_flex_joint', 'arm_wrist_flex_joint', 'arm_wrist_roll_joint']
-joints_tucked  = [0.0, -1.57, 0.0, -1.7, 1.7, 1.57, -0.066472500808377785]
-joints_untucked  = [0.0, 0.0, 0.0, -1.57, 1.57, 1.57, -0.066472500808377785]
 
 # TODO: This is currently quite the hack. The simple_moveit_plugin will use the
 #       js.position[0] as the input to the gripper (which is interpreted as how
@@ -443,8 +427,6 @@ class ObjectManager:
         return l
 
 class ArmPlanner:
-    _group = 'arm'
-    _gripper_group = 'gripper'
 
     # This is a bit hacky, basically I'm making the "table" thick, and not adding individual chess pieces
     BOARD_THICKNESS = 0.2
@@ -452,13 +434,13 @@ class ArmPlanner:
 
     """ Chess-specific stuff """
     def __init__(self, listener = None):
-        self._pick = PickupManager(self._group, self._gripper_group)
-        self._place = PlaceManager(self._group, self._gripper_group)
+        self._pick = PickupManager(GROUP_NAME_ARM, GROUP_NAME_GRIPPER)
+        self._place = PlaceManager(GROUP_NAME_ARM, GROUP_NAME_GRIPPER)
         self._obj = ObjectManager(FIXED_FRAME)
         self._listener = listener
         if self._listener == None:
             self._listener = TransformListener()
-        self._move = MotionManager(self._group, FIXED_FRAME, self._listener)
+        self._move = MotionManager(GROUP_NAME_ARM, FIXED_FRAME, self._listener)
         self.success = True
 
     def move_piece(self, start_pose, end_pose):
@@ -574,11 +556,11 @@ class ArmPlanner:
 
 if __name__=='__main__':
     rospy.init_node('grasp_utilities')
-    pick = PickupManager('Arm', 'Gripper')
-    place = PlaceManager('Arm', 'Gripper')
+    pick = PickupManager(GROUP_NAME_ARM, GROUP_NAME_GRIPPER)
+    place = PlaceManager(GROUP_NAME_ARM, GROUP_NAME_GRIPPER)
     obj = ObjectManager(FIXED_FRAME)
     listener = TransformListener()
-    move = MotionManager('Arm', FIXED_FRAME, listener)
+    move = MotionManager(GROUP_NAME_ARM, FIXED_FRAME, listener)
     # need time for listener to get data
     rospy.sleep(3.0)
 
