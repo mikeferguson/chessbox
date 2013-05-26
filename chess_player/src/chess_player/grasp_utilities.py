@@ -443,8 +443,8 @@ class ObjectManager:
         return l
 
 class ArmPlanner:
-    _group = 'Arm'
-    _gripper_group = 'Gripper'
+    _group = 'arm'
+    _gripper_group = 'gripper'
 
     # This is a bit hacky, basically I'm making the "table" thick, and not adding individual chess pieces
     BOARD_THICKNESS = 0.2
