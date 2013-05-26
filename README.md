@@ -61,14 +61,15 @@ The only robot-related aspect is that the head should be pointed at the board. A
 have *base_link*, you will need to set ~fixed_frame for the chess_perception_node. The other major issue is
 that the perception code currently is not entirely robust to pieces being improperly placed on the board.
 
+### chess_player/src/robot_defs.py
+All of this file is potentially robot-specific.
+
 ### chess_player/src/head_utilities.py
 This is currently hard coded with angles for Maxwell. Ideally this would eventually turn into a point_head
 action, with a "search and then cache" function for "looking at the board".
 
 ### chess_player/src/grasp_utilities.py
-There are a number of parameters and hacks still in here. GRIPPER_FRAME, FIXED_FRAME, etc should probably
-become parameters. Something should be done with OFF_BOARD positions used for capture. Gripper stuff should
-be better....
+Something should be done with OFF_BOARD positions used for capture.
 
 The functions for getGripperPosture, getGripperTranslation, and all of the grasp generation stuff (getY, getP,
 getGrasps, getPlaceLocations) are Maxwell-specific, although if your arm is *pretty good* at overhead grasps
