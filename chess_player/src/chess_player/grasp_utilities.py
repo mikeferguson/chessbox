@@ -58,9 +58,23 @@ def getGripperPosture(pose):
     js = JointState()
     js.name = ['l_gripper_joint', 'r_gripper_joint']
     js.position = [pose, pose]
-    js.velocity = [0.0, 0.0]
+    js.velocity = [1.0, 1.0]
     js.effort = [1.0, 1.0]
     return js
+
+# This is our hacky grasp generation
+def iterate_closest(start, values):
+    values_used = list()
+    while len(values) > len(values_used):
+        c = 0
+        dist = 100
+        for i in values:
+            if not i in values_used:
+                if abs(i-start) < dist:
+                    dist = abs(i-start)
+                    c = i
+        values_used.append(c)
+        yield c
 
 def getGripperTranslation(min_dist, desired, axis=1.0):
     gt = GripperTranslation()
@@ -70,105 +84,47 @@ def getGripperTranslation(min_dist, desired, axis=1.0):
     gt.desired_distance = desired
     return gt
 
-def getY(start):
-    y = [0.0, -.78, .78, -1.57, 1.57]
-    sent = list()
-    while len(y) > len(sent):
-        c = 0
-        dist = 100
-        for i in y:
-            if not i in sent:
-                if abs(i-start) < dist:
-                    dist = abs(i-start)
-                    c = i
-        sent.append(c)
-        yield c
-
-def getP(start):
-    p = [0.0, 0.05, 0.1, 0.2, -0.5, -0.1, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-    sent = list()
-    while len(p) > len(sent):
-        c = 0
-        dist = 100
-        for i in p:
-            if not i in sent:
-                if abs(i-start) < dist:
-                    dist = abs(i-start)
-                    c = i
-        sent.append(c)
-        yield c
-
-# TODO: all this generator crap was created before changing approach frame to
-#       gripper_link -- at some point, should see if we can remove it all and just
-#       pass a list of grasps to moveit (previously, it crashed with an Eigen error
-#       and I just didn't have time to fix it)
-def getGrasps(pose_stamped): #, y_start = 0.0, p_start = 0.0):
+def getGrasps(pose_stamped):
     """ Returns an iterator of increasingly worse grasps. """
     g = Grasp()
-    # directly overhead first
-    g.id = 'direct_overhead'
     g.pre_grasp_posture = getGripperPosture(GRIPPER_OPEN)
     g.grasp_posture = getGripperPosture(GRIPPER_CLOSED)
     g.grasp_pose = pose_stamped
-#    q = quaternion_from_euler(0, 1.57, 0)
-#    g.grasp_pose.pose.orientation.x = q[0]
-#    g.grasp_pose.pose.orientation.y = q[1]
-#    g.grasp_pose.pose.orientation.z = q[2]
-#    g.grasp_pose.pose.orientation.w = q[3]
-#    g.grasp_quality = 1.0
     g.approach = getGripperTranslation(0.05, 0.15)
     g.retreat = getGripperTranslation(0.05, 0.15, -1.0)
-    #g.max_contact_force =
-    #g.allowed_touch_objects[] =
-#    yield g
+    idx = 0
     print(pose_stamped.pose)
-    diag = ((pose_stamped.pose.position.x**2) + (pose_stamped.pose.position.y**2)) ** 0.5
-    p_start = (diag-0.22)*4 #(pose_stamped.pose.position.y) * 5.0
-    y_start = atan2(pose_stamped.pose.position.y, pose_stamped.pose.position.x - 0.055) * -1.3 #(pose_stamped.pose.position.x - .2) * 0.9
-    print("p/y: %f, %f" % (p_start, y_start))
-    # now tilt the hand a bit, and rotate about yaw
-    for y in getY(y_start): # [0.0, -.78, .78, -1.57, 1.57]:
-        for p in getP(p_start): #[0.0, 0.05, 0.1, 0.2, -0.5, -0.1, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
+    for y in iterate_closest(0, [0.0, -.78, .78, -1.57, 1.57]):
+        for p in iterate_closest(0,[0.0, 0.05, -0.5, 0.1, -0.1, 0.2, -0.2, 0.3, -0.3, 0.4, -0.4, 0.5, -0.5, 0.6, -0.6]):
             q = quaternion_from_euler(0, 1.57-p, y)
             g.grasp_pose.pose.orientation.x = q[0]
             g.grasp_pose.pose.orientation.y = q[1]
             g.grasp_pose.pose.orientation.z = q[2]
             g.grasp_pose.pose.orientation.w = q[3]
-            g.id = str(p) + '+' + str(y)
-            g.grasp_quality = 1.0 - (1.25 * p) - abs(y)/4.0
+            g.id = str(idx)
+            idx += 1
+            g.grasp_quality = 1.0
             rospy.loginfo("pick %f, %f", p, y)
-            #pub.publish(pa)
             yield g
 
 def getPlaceLocations(pose_stamped):
     """ Returns an iterator of increasingly worse place locations. """
     l = PlaceLocation()
-    # directly overhead first
-    l.id = 'direct_overhead'
     l.place_pose = pose_stamped
-#   q = quaternion_from_euler(0, 1.57, 0)
-#   l.place_pose.pose.orientation.x = q[0]
-#   l.place_pose.pose.orientation.y = q[1]
-#   l.place_pose.pose.orientation.z = q[2]
-#   l.place_pose.pose.orientation.w = q[3]
     l.approach = getGripperTranslation(0.05, 0.15)
     l.retreat = getGripperTranslation(0.05, 0.15, -1.0)
     l.post_place_posture = getGripperPosture(GRIPPER_OPEN)
-#    yield l
+    idx = 0
     print(pose_stamped.pose)
-    diag = ((pose_stamped.pose.position.x**2) + (pose_stamped.pose.position.y**2)) ** 0.5
-    p_start = (diag-0.22)*4 #(pose_stamped.pose.position.y) * 5.0
-    y_start = atan2(pose_stamped.pose.position.y, pose_stamped.pose.position.x - 0.055) * -1.3 #(pose_stamped.pose.position.x - .2) * 0.9
-    print("p/y: %f, %f" % (p_start, y_start))
-    # now tilt the hand a bit, and rotate about yaw
-    for y in getY(y_start): # [0.0, -.78, .78, -1.57, 1.57]:
-        for p in getP(p_start): #[0.0, 0.05, 0.1, 0.2, -0.5, -0.1, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
+    for y in iterate_closest(0, [0.0, -.78, .78, -1.57, 1.57]):
+        for p in iterate_closest(0,[0.0, 0.05, -0.5, 0.1, -0.1, 0.2, -0.2, 0.3, -0.3, 0.4, -0.4, 0.5, -0.5, 0.6, -0.6]):
             q = quaternion_from_euler(0, p, y) # place is in terms of object coordinate frame, not gripper
             l.place_pose.pose.orientation.x = q[0]
             l.place_pose.pose.orientation.y = q[1]
             l.place_pose.pose.orientation.z = q[2]
             l.place_pose.pose.orientation.w = q[3]
-            l.id = str(p) + '+' + str(y)
+            l.id = str(idx)
+            idx += 1
             rospy.loginfo("place %f, %f", p, y)
             yield l
 
@@ -632,6 +588,9 @@ if __name__=='__main__':
 
     if 1:
         i = 0
+
+        import time
+        t = time.time()
         for col in 'abcdefgh':
             # manipulate a part
             p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
@@ -648,4 +607,5 @@ if __name__=='__main__':
             move.moveToJointPosition(joint_names, joints_tucked)
             rospy.sleep(1)
             i+=1
+        print("elapsed time: ", time.time() - t)
 
