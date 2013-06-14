@@ -33,7 +33,7 @@ from sensor_msgs.msg import JointState
 from geometry_msgs.msg import PoseStamped, Pose, PoseArray
 from shape_msgs.msg import SolidPrimitive
 from moveit_msgs.msg import PickupAction, PickupGoal, PlaceAction, PlaceGoal, MoveGroupAction, MoveGroupGoal
-from moveit_msgs.msg import Constraints, JointConstraint, PositionConstraint, OrientationConstraint
+from moveit_msgs.msg import Constraints, JointConstraint, PositionConstraint, OrientationConstraint, BoundingVolume
 from moveit_msgs.msg import AttachedCollisionObject, CollisionObject, PlanningScene
 from manipulation_msgs.msg import Grasp, GripperTranslation, PlaceLocation
 
