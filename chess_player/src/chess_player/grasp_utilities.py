@@ -56,10 +56,14 @@ OFF_BOARD_Z = 0.10
 def getGripperPosture(pose):
     """ This is Maxwell-specific. """
     js = JointState()
-    js.name = ['l_gripper_joint', 'r_gripper_joint']
-    js.position = [pose, pose]
-    js.velocity = [1.0, 1.0]
-    js.effort = [1.0, 1.0]
+    if ROBOT_NAME == "maxwell":
+        js.name = ['l_gripper_joint', 'r_gripper_joint']
+        js.position = [pose, pose]
+        js.velocity = [1.0, 1.0]
+        js.effort = [1.0, 1.0]
+    else:
+        js.name = ['right_gripper_joint']
+        js.position = [pose]
     return js
 
 # This is our hacky grasp generation
@@ -520,6 +524,8 @@ if __name__=='__main__':
     # need time for listener to get data
     rospy.sleep(3.0)
 
+    move.moveToJointPosition(joint_names, joints_ready)
+
     ####################################################
     # this code will display the grasp pose array
     if 0:
@@ -549,6 +555,14 @@ if __name__=='__main__':
 
     ####################################################
     # this was the original testing code
+    p = PoseStamped()
+    p.header.frame_id = 'chess_board'
+    q = quaternion_from_euler(0.0, 0, 0)
+    p.pose.orientation.x = q[0]
+    p.pose.orientation.y = q[1]
+    p.pose.orientation.z = q[2]
+    p.pose.orientation.w = q[3]
+
     if 1:
         # remove old pieces/table if any
         obj.remove('part')
@@ -559,17 +573,10 @@ if __name__=='__main__':
 
     if 1:
         # add table
-        p = PoseStamped()
         p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
-        p.header.frame_id = 'chess_board'
         p.pose.position.x = SQUARE_SIZE * 4
         p.pose.position.y = SQUARE_SIZE * 4
-        p.pose.position.z = 0
-        q = quaternion_from_euler(0.0, 0, 0)
-        p.pose.orientation.x = q[0]
-        p.pose.orientation.y = q[1]
-        p.pose.orientation.z = q[2]
-        p.pose.orientation.w = q[3]
+        p.pose.position.z = -0.075
         p_transformed = listener.transformPose(FIXED_FRAME, p)
 
         obj.addBox('table', 0.05715 * 8, 0.05715 * 8, .15, p_transformed.pose.position.x, p_transformed.pose.position.y, p_transformed.pose.position.z)
@@ -592,7 +599,7 @@ if __name__=='__main__':
 
         # move all pawns forward
         i = 0
-        for col in []: #'abcdefgh':
+        for col in 'abcdefgh':
             print(col+"2")
             # manipulate a part
             p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
@@ -612,7 +619,7 @@ if __name__=='__main__':
                 p_transformed.pose.position.x -= SQUARE_SIZE*2
                 place.place(col+"2", p_transformed)
 
-            move.moveToJointPosition(joint_names, joints_tucked)
+            move.moveToJointPosition(joint_names, joints_ready)
             rospy.sleep(1)
             i+=1
         print("elapsed time: ", time.time() - t)
@@ -639,7 +646,7 @@ if __name__=='__main__':
                 p_transformed.pose.position.x -= SQUARE_SIZE*2
                 place.place(col+"1", p_transformed)
 
-            move.moveToJointPosition(joint_names, joints_tucked)
+            move.moveToJointPosition(joint_names, joints_ready)
             rospy.sleep(1)
             i+=1
         print("elapsed time: ", time.time() - t)
@@ -665,7 +672,7 @@ if __name__=='__main__':
                 p_transformed.pose.position.x -= SQUARE_SIZE*2
                 place.place(col+"2", p_transformed)
 
-            move.moveToJointPosition(joint_names, joints_tucked)
+            move.moveToJointPosition(joint_names, joints_ready)
             rospy.sleep(1)
             i+=1
         print("elapsed time: ", time.time() - t)

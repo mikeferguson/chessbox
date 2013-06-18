@@ -27,4 +27,7 @@ from chess_player.grasp_utilities import ArmPlanner
 if __name__=='__main__':
     rospy.init_node('tuck_arm')
     p = ArmPlanner()
-    p.tuck()
+    if "--u" in sys.argv:
+        p.untuck()
+    else:
+        p.tuck()
