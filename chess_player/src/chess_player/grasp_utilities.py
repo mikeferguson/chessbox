@@ -98,7 +98,7 @@ def getGrasps(pose_stamped):
     g.retreat = getGripperTranslation(0.05, 0.15, -1.0)
     idx = 0
     print(pose_stamped.pose)
-    for y in iterate_closest(0, [0.0, -.78, .78, -1.57, 1.57]):
+    for y in iterate_closest(0.78, [0.0, -.78, .78, -1.57, 1.57]):
         for p in iterate_closest(0,[0.0, 0.05, -0.05, 0.1, -0.1, 0.2, -0.2, 0.3, -0.3, 0.4, -0.4, 0.5, -0.5, 0.6, -0.6, 0.7, -0.7, 0.8, -0.8, .9, -0.9]):
             q = quaternion_from_euler(0, 1.57-p, y)
             g.grasp_pose.pose.orientation.x = q[0]
