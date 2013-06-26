@@ -1,5 +1,5 @@
 <launch>
-  <param name="chess_square_size" value="0.05715">
+  <param name="chess_square_size" value="0.05715"/>
 
   <node pkg="chess_perception" type="chess_perception" name="chess_perception_node" respawn="true" output="screen"/>
 
