@@ -49,9 +49,11 @@ class PieceFinder
                    std::vector<double>& weights);
 
     /** \brief Set the size of a square on our chess board. */
-    void setSquareSize(double size) { square_size_ = size; }
+    void setSquareSize(double size);
 
   private:
+    void setupUntransformedHull();
+
     bool debug_;
     int threshold_;
     double square_size_;

@@ -52,7 +52,7 @@ static void hsv2rgb(float h, float s, float v, float& r, float& g, float& b)
 }
 
 
-PieceFinder::PieceFinder()
+PieceFinder::PieceFinder() : square_size_(0.05715)
 {
     ros::NodeHandle nh ("~");
 
@@ -66,15 +66,7 @@ PieceFinder::PieceFinder()
         pieces_cloud_pub_ = nh.advertise< pcl::PointCloud<pcl::PointXYZRGB> >("pieces", 1);
     }
 
-    /* Setup an untransformed hull */
-    pcl::PointXYZRGB p;
-    hull_untransformed_.push_back(p);
-    p.x = square_size_ * 8;
-    hull_untransformed_.push_back(p);
-    p.y = square_size_ * 8;
-    hull_untransformed_.push_back(p);
-    p.x = 0;
-    hull_untransformed_.push_back(p);
+    setupUntransformedHull();
 
     /* Setup extract polygonal prism data */
     extract_data_.setHeightLimits(0.01, 0.2);
@@ -86,6 +78,29 @@ PieceFinder::PieceFinder()
     cluster_.setClusterTolerance(0.01);
     cluster_.setMinClusterSize(1);
     cluster_.setMaxClusterSize(3000);
+}
+
+void PieceFinder::setupUntransformedHull()
+{
+    /* Remove an points */
+    hull_untransformed_.clear();
+
+    /* Push back the 3 corners */
+    pcl::PointXYZRGB p;
+    hull_untransformed_.push_back(p);
+    p.x = square_size_ * 8;
+    hull_untransformed_.push_back(p);
+    p.y = square_size_ * 8;
+    hull_untransformed_.push_back(p);
+    p.x = 0;
+    hull_untransformed_.push_back(p);
+
+}
+
+void PieceFinder::setSquareSize(double size)
+{
+    square_size_ = size;
+    setupUntransformedHull();
 }
 
 int PieceFinder::findPieces(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
