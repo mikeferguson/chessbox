@@ -98,8 +98,9 @@ def getGrasps(pose_stamped):
     g.retreat = getGripperTranslation(0.05, 0.15, -1.0)
     idx = 0
     print(pose_stamped.pose)
-    for y in iterate_closest(0.78, [0.0, -.78, .78, -1.57, 1.57]):
-        for p in iterate_closest(0,[0.0, 0.05, -0.05, 0.1, -0.1, 0.2, -0.2, 0.3, -0.3, 0.4, -0.4, 0.5, -0.5, 0.6, -0.6, 0.7, -0.7, 0.8, -0.8, .9, -0.9]):
+    grasps = []
+    for y in iterate_closest(.78, [0.0, -.78, .78, -1.57, 1.57]):
+        for p in iterate_closest(0, [0.0, 0.3, -0.3, 0.05, -0.05, 0.1, -0.1, 0.2, -0.2, 0.3, -0.3, 0.4, -0.4, 0.5, -0.5, 0.625, -0.625, 0.75, -0.75]):
             q = quaternion_from_euler(0, 1.57-p, y)
             g.grasp_pose.pose.orientation.x = q[0]
             g.grasp_pose.pose.orientation.y = q[1]
@@ -107,9 +108,9 @@ def getGrasps(pose_stamped):
             g.grasp_pose.pose.orientation.w = q[3]
             g.id = str(idx)
             idx += 1
-            g.grasp_quality = 1.0
-            rospy.loginfo("pick %f, %f", p, y)
-            yield g
+            g.grasp_quality = 1.0 - abs(p/2.0)
+            grasps.append(copy.deepcopy(g))
+    return grasps
 
 def getPlaceLocations(pose_stamped):
     """ Returns an iterator of increasingly worse place locations. """
@@ -120,8 +121,9 @@ def getPlaceLocations(pose_stamped):
     l.post_place_posture = getGripperPosture(GRIPPER_OPEN)
     idx = 0
     print(pose_stamped.pose)
-    for y in iterate_closest(0, [0.0, -.78, .78, -1.57, 1.57]):
-        for p in iterate_closest(0,[0.0, 0.05, -0.05, 0.1, -0.1, 0.2, -0.2, 0.3, -0.3, 0.4, -0.4, 0.5, -0.5, 0.6, -0.6, 0.7, -0.7, 0.8, -0.8]):
+    locs = []
+    for y in iterate_closest(.78, [0.0, -.78, .78, -1.57, 1.57]):
+        for p in iterate_closest(0,[0.0, 0.05, -0.05, 0.1, -0.1, 0.2, -0.2, 0.3, -0.3, 0.4, -0.4, 0.5, -0.5]):
             q = quaternion_from_euler(0, p, y) # place is in terms of object coordinate frame, not gripper
             l.place_pose.pose.orientation.x = q[0]
             l.place_pose.pose.orientation.y = q[1]
@@ -129,8 +131,8 @@ def getPlaceLocations(pose_stamped):
             l.place_pose.pose.orientation.w = q[3]
             l.id = str(idx)
             idx += 1
-            rospy.loginfo("place %f, %f", p, y)
-            yield l
+            locs.append(copy.deepcopy(l))
+    return locs
 
 class PickupManager:
     """ This class enables a pick action. """
@@ -143,28 +145,25 @@ class PickupManager:
 
     def pickup(self, name, pose_stamped):
         """ This will try to pick up a chess piece. """
-        i = 1
-        for grasp in getGrasps(pose_stamped):
-            g = PickupGoal()
-            g.target_name = name
-            g.group_name = self._group
-            g.end_effector = self._effector
-            g.possible_grasps = [grasp]
-            g.support_surface_name = "table"
-            g.allow_gripper_support_collision = True
-            g.attached_object_touch_links = list() # empty list = use all links of end-effector
-            #g.path_constraints = ??
-            #g.allowed_touch_objects = ['part']
-            g.allowed_planning_time = 30.0
-            #g.planning_options.planning_scene_diff = ??
-            g.planning_options.plan_only = PLAN_ONLY
-            self._action.send_goal(g)
-            self._action.wait_for_result()
-            if self._action.get_result().error_code.val == 1:
-                rospy.loginfo("Pick succeeded")
-                return True
-            rospy.loginfo("Failed Pick attempt %d" % i)
-            i += 1
+        g = PickupGoal()
+        g.target_name = name
+        g.group_name = self._group
+        g.end_effector = self._effector
+        g.possible_grasps = getGrasps(pose_stamped)
+        g.support_surface_name = "table"
+        g.allow_gripper_support_collision = True
+        g.attached_object_touch_links = list() # empty list = use all links of end-effector
+        #g.path_constraints = ??
+        #g.allowed_touch_objects = ['part']
+        g.allowed_planning_time = 30.0
+        #g.planning_options.planning_scene_diff = ??
+        g.planning_options.plan_only = PLAN_ONLY
+        self._action.send_goal(g)
+        self._action.wait_for_result()
+        if self._action.get_result().error_code.val == 1:
+            rospy.loginfo("Pick succeeded")
+            return True
+        rospy.loginfo("Pick failed")
         return False
 
 class PlaceManager:
@@ -177,26 +176,23 @@ class PlaceManager:
         self._action.wait_for_server()
 
     def place(self, name, pose_stamped):
-        i = 1
-        for location in getPlaceLocations(pose_stamped):
-            g = PlaceGoal()
-            g.group_name = self._group
-            g.attached_object_name = name
-            g.place_locations = [location]
-            g.support_surface_name = "table"
-            g.allow_gripper_support_collision = True
-            #g.path_constraints = ??
-            #g.allowed_touch_objects = ['part']
-            g.allowed_planning_time = 30.0
-            #g.planning_options.planning_scene_diff = ??
-            g.planning_options.plan_only = PLAN_ONLY
-            self._action.send_goal(g)
-            self._action.wait_for_result()
-            if self._action.get_result().error_code.val == 1:
-                rospy.loginfo("Place succeeded")
-                return True
-            rospy.loginfo("Failed place attempt %d" % i)
-            i += 1
+        g = PlaceGoal()
+        g.group_name = self._group
+        g.attached_object_name = name
+        g.place_locations = getPlaceLocations(pose_stamped)
+        g.support_surface_name = "table"
+        g.allow_gripper_support_collision = True
+        #g.path_constraints = ??
+        #g.allowed_touch_objects = ['part']
+        g.allowed_planning_time = 30.0
+        #g.planning_options.planning_scene_diff = ??
+        g.planning_options.plan_only = PLAN_ONLY
+        self._action.send_goal(g)
+        self._action.wait_for_result()
+        if self._action.get_result().error_code.val == 1:
+            rospy.loginfo("Place succeeded")
+            return True
+        rospy.loginfo("Place failed")
         return False
 
 class MotionManager:
