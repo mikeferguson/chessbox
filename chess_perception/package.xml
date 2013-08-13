@@ -13,6 +13,8 @@
 
   <build_depend>geometry_msgs</build_depend>
   <build_depend>eigen</build_depend>
+  <build_depend>chess_msgs</build_depend>
+  <build_depend>sensor_msgs</build_depend>
   <build_depend>roscpp</build_depend>
   <build_depend>opencv2</build_depend>
   <build_depend>cv_bridge</build_depend>

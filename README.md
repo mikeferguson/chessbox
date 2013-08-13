@@ -52,6 +52,10 @@ broken from time to time:
 
     rosrun chess_player chess_executive.py --sim
 
+## Running on that other robot
+
+  rosrun tf static_transform_publisher .4 .2286 .7366 -1.57 0 0 base_footprint chess_board 20
+
 ## Adapting to a new robot
 Much of this code is robot-independent. Below I list the files known not to be (in other words, if the file
 isn't in this list, it is probably robot-independent).
