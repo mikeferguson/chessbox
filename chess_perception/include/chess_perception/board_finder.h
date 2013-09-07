@@ -26,6 +26,8 @@ Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 #include <pcl/point_types.h>
 #include <pcl_ros/point_cloud.h>
+#include <pcl_conversions/pcl_conversions.h>
+#include <chess_perception/conversions.h>
 #include <cv_bridge/cv_bridge.h>
 
 #include <opencv/cv.h>

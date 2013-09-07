@@ -95,7 +95,7 @@ bool BoardFinder::findBoard(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
 {
     /* Get an OpenCV image from the cloud */
     sensor_msgs::ImagePtr image_msg(new sensor_msgs::Image);
-    pcl::toROSMsg (*cloud, *image_msg);
+    pcl_broke_again::toROSMsg (*cloud, *image_msg);
     try
     {
         bridge_ = cv_bridge::toCvCopy(image_msg, "rgb8");

@@ -26,6 +26,7 @@ Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #include <pcl/point_types.h>
 #include <pcl_ros/point_cloud.h>
 #include <pcl_ros/transforms.h>
+#include <pcl_conversions/pcl_conversions.h>
 
 #include <chess_perception/piece_finder.h>
 #include <chess_perception/board_finder.h>
@@ -105,8 +106,8 @@ class ChessPerception
         for (size_t i = 0; i < piece_count; i++)
         {
             chess_msgs::ChessPiece p;
+            p.header = pcl_conversions::fromPCL(cloud->header);
             p.header.frame_id = "chess_board";
-            p.header.stamp = cloud->header.stamp;
             p.pose.position.x = pieces[i].x;
             p.pose.position.y = pieces[i].y;
             p.pose.position.z = pieces[i].z;
