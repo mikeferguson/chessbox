@@ -264,6 +264,12 @@ bool BoardFinder::findBoard(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
         }
     }
 
+    if(debug_)
+    {
+        bridge_->image = cdst;
+        image_pub_.publish( bridge_->toImageMsg() );
+    }
+
     /* We need some data from each row */
     if(corner_points_2d.size() < 7)
     {
@@ -312,8 +318,6 @@ bool BoardFinder::findBoard(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
 
     if(debug_)
     {
-        bridge_->image = cdst;
-        image_pub_.publish( bridge_->toImageMsg() );
         points.header = cloud->header;
         cloud_pub_.publish(points);
     }
