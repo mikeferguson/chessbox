@@ -73,7 +73,15 @@ class ChessPerception
         if(frames_++ % skip_ != 0) return;
 
         tf::StampedTransform tr2;
-        listener_.lookupTransform(fixed_frame_, cloud->header.frame_id, ros::Time(0), tr2);
+        try
+        {
+          listener_.lookupTransform(fixed_frame_, cloud->header.frame_id, ros::Time(0), tr2);
+        }
+        catch (tf::TransformException ex)
+        {
+          ROS_ERROR("%s", ex.what());
+          return;
+        }
 
         /* Find potential corner points of board.
          * This is a mostly 2d-operation that is quite fast, but somewhat unreliable.
