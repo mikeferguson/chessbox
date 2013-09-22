@@ -495,6 +495,7 @@ class ArmPlanner:
     # TODO: can we kill this?
     def getReach(self, col, rank, board):
         """ Find the reach required to get to a position """
+        return 0.1
         ps = PoseStamped()
         ps.header.frame_id = self.CHESS_BOARD_FRAME
         ps.pose = self.getPose(board.getColIdx(col), int(rank), board)

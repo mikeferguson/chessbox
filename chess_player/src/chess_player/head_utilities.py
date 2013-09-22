@@ -28,14 +28,12 @@ from diagnostic_msgs.msg import DiagnosticArray
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from control_msgs.msg import *
 
+from robot_defs import *
+
 class HeadEngine:   # a crazy name, but matches our convention
     
     def __init__(self, client=None):
-        self.joints = ["head_pan_joint", "head_tilt_joint"] 
-        self.last = [None, None] 
-        self.temps = [0.0, 0.0]
-        self.previous_tilt = None
-        self.previous_pan = None
+        self.joints = head_joint_names
         self.iter = 0
 
         if client != None:
@@ -44,34 +42,6 @@ class HeadEngine:   # a crazy name, but matches our convention
             self._client = actionlib.SimpleActionClient('head_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
         self._client.wait_for_server()
 
-        rospy.Subscriber('joint_states', JointState, self.stateCb)
-        rospy.Subscriber('diagnostics', DiagnosticArray, self.diagnosticCb)
-
-        # setup home positions
-        while self.last[0] == None:
-            pass
-        self.home_pan = 0.0
-        self.home_tilt = 1.15
-    
-    def stateCb(self, msg):
-        """ Callback for JointState message. """
-        try:
-            indexes = [msg.name.index(name) for name in self.joints]
-        except ValueError as val:
-            rospy.logerr('/joint_stats.name is invalid.')
-            return
-        self.last = [ msg.position[k] for k in indexes ]
-
-    def diagnosticCb(self, msg):
-        """ ... """
-        for entry in msg.status:
-            name = entry.name.replace("Joint ", "")
-            if name in self.joints:
-                i = self.joints.index(name)
-                for kv in entry.values:
-                    if kv.key == "Temperature":
-                        self.temps[i] = kv.value
-        
     #######################################################
     # look at person/board
     def look_at_player(self):
@@ -80,11 +50,12 @@ class HeadEngine:   # a crazy name, but matches our convention
         msg.points = list()
     
         point = JointTrajectoryPoint()
-        point.positions = [0.0, 0.0]
+        point.positions = head_pose_look_at_player
+        point.velocities = [0.0 for j in self.joints]
         point.time_from_start = rospy.Duration(3.0)
         msg.points.append(point)
 
-        msg.header.stamp = rospy.Time.now() + rospy.Duration(0.1)
+        msg.header.stamp = rospy.Time.now()
 
         goal = FollowJointTrajectoryGoal()
         goal.trajectory = msg
@@ -97,17 +68,19 @@ class HeadEngine:   # a crazy name, but matches our convention
         msg.points = list()
     
         point = JointTrajectoryPoint()
-        point.positions = [0.0, self.home_tilt]
+        point.positions = head_pose_look_at_board
+        point.velocities = [0.0 for j in self.joints]
         point.time_from_start = rospy.Duration(3.0)
         msg.points.append(point)
 
-        msg.header.stamp = rospy.Time.now() + rospy.Duration(0.1)
+        msg.header.stamp = rospy.Time.now()
 
         goal = FollowJointTrajectoryGoal()
         goal.trajectory = msg
         self._client.send_goal(goal)
 
     def wiggle_head(self):
+        """ We always wiggle the first joint """
         self.iter = (self.iter+1)%5
 
         msg = JointTrajectory()
@@ -115,7 +88,9 @@ class HeadEngine:   # a crazy name, but matches our convention
         msg.points = list()
     
         point = JointTrajectoryPoint()
-        point.positions = [self.home_pan+(self.iter-2)*0.05, self.home_tilt]
+        point.positions = head_pose_look_at_board
+        point.positions[0] += (self.iter-2)*0.05
+        point.velocities = [0.0 for j in self.joints]
         point.time_from_start = rospy.Duration(0.5)
         msg.points.append(point)
 
