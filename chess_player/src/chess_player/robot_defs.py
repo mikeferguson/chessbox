@@ -19,8 +19,8 @@
   Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 """
 
-ROBOT_NAME = "maxwell"
-#ROBOT_NAME = "that_other_bot"
+#ROBOT_NAME = "maxwell"
+ROBOT_NAME = "that_other_bot"
 
 # TODO: load this from URDF?
 if ROBOT_NAME == "maxwell":
@@ -45,6 +45,10 @@ if ROBOT_NAME == "maxwell":
     joints_untucked  = [0.0, 0.0, 0.0, -1.57, 1.57, 1.57, -0.066472500808377785]
     joints_ready = joints_tucked
 
+    head_joint_names = ['head_pan_joint', 'head_tilt_joint']
+    head_pose_look_at_board = [0.0, 1.15]
+    head_pose_look_at_player = [0.0, 0.0]
+
 elif ROBOT_NAME == "that_other_bot":
     GROUP_NAME_ARM = 'arm'
     GROUP_NAME_GRIPPER = 'gripper'
@@ -55,7 +59,7 @@ elif ROBOT_NAME == "that_other_bot":
 
     # The frame that all objects/poses should be translated to, the frame in which
     #   moveit planning is done
-    FIXED_FRAME = 'base_footprint'
+    FIXED_FRAME = 'base_link'
 
     # This was previously 0.0075
     GRIPPER_CLOSED = 0.015
@@ -66,3 +70,7 @@ elif ROBOT_NAME == "that_other_bot":
     joints_tucked  = [0.0, -1.4486, 1.3439, 2.8327, -1.8119, 0.0, 1.6571, 0.0]
     joints_untucked  = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     joints_ready  = [0.2, -1.4486, 0, 1.68, -1.32, 0.0, 0.55, 1.38]
+
+    head_joint_names = ['head_pan_joint', 'head_tilt_joint']
+    head_pose_look_at_board = [0.0, -1.0]
+    head_pose_look_at_player = [0.0, 0.0]
