@@ -35,6 +35,7 @@ from shape_msgs.msg import SolidPrimitive
 from moveit_msgs.msg import PickupAction, PickupGoal, PlaceAction, PlaceGoal, MoveGroupAction, MoveGroupGoal
 from moveit_msgs.msg import Constraints, JointConstraint, PositionConstraint, OrientationConstraint, BoundingVolume
 from moveit_msgs.msg import AttachedCollisionObject, CollisionObject, PlanningScene
+from moveit_msgs.srv import *
 from manipulation_msgs.msg import Grasp, GripperTranslation, PlaceLocation
 
 from chess_utilities import SQUARE_SIZE, castling_extras
@@ -292,9 +293,13 @@ class MotionManager:
         self._action.wait_for_result()
         return self._action.get_result()
 
-# TODO: Add a 'mass' add function
+## @brief A class for managing the state of the objects in the planning scene
+## @param frame The fixed frame in which planning is being done (needs to be part of robot?)
+## @param init_from_service Whether to initialize our list of objects by calling the service
+##            NOTE: this requires that said service be in the move_group launch file, which
+##            is not the default from the setup assistant.
 class ObjectManager:
-    def __init__(self, frame):
+    def __init__(self, frame, init_from_service = True):
         self._fixed_frame = frame
 
         # publisher to send objects
@@ -305,18 +310,53 @@ class ObjectManager:
         self._mutex = thread.allocate_lock()
         self._attached = list()
         self._collision = list()
+        self._objects = dict()
+
+        # get the initial planning scene
+        if init_from_service:
+            rospy.loginfo('Waiting for get_planning_scene')
+            rospy.wait_for_service('get_planning_scene')
+            self._service = rospy.ServiceProxy('get_planning_scene', GetPlanningScene)
+            try:
+                req = PlanningSceneComponents()
+                req.components = PlanningSceneComponents.WORLD_OBJECT_NAMES + \
+                                 PlanningSceneComponents.WORLD_OBJECT_GEOMETRY + \
+                                 PlanningSceneComponents.ROBOT_STATE_ATTACHED_OBJECTS
+                scene = self._service(req)
+                self.sceneCb(scene.scene)
+            except rospy.ServiceException as e:
+                print('Failed to get initial planning scene, results may be wonky: %s' % e)
+
+        # subscribe to planning scene
         rospy.Subscriber('move_group/monitored_planning_scene', PlanningScene, self.sceneCb)
 
-    def addBox(self, name, size_x, size_y, size_z, x, y, z):
+    ## @brief Insert a solid primitive into planning scene
+    ## @param wait When true, we wait for planning scene to actually update,
+    ##             this provides immunity against lost messages.
+    def addSolidPrimitive(self, name, solid, pose, wait = True):
         o = CollisionObject()
         o.header.stamp = rospy.Time.now()
         o.header.frame_id = self._fixed_frame
         o.id = name
+        o.primitives.append(solid)
+        o.primitive_poses.append(pose)
+        o.operation = o.ADD
 
+        self._objects[name] = o
+
+        self._pub.publish(o)
+        while wait and not name in self.getKnownCollisionObjects():
+            rospy.logdebug('Waiting for object to add')
+            self._pub.publish(o)
+            rospy.sleep(0.1)
+
+    ## @brief Insert new box into planning scene
+    ## @param wait When true, we wait for planning scene to actually update,
+    ##             this provides immunity against lost messages.
+    def addBox(self, name, size_x, size_y, size_z, x, y, z, wait = True):
         s = SolidPrimitive()
         s.dimensions = [size_x, size_y, size_z]
         s.type = s.BOX
-        o.primitives.append(s)
 
         ps = PoseStamped()
         ps.header.frame_id = self._fixed_frame
@@ -324,20 +364,18 @@ class ObjectManager:
         ps.pose.position.y = y
         ps.pose.position.z = z
         ps.pose.orientation.w = 1.0
-        o.primitive_poses.append(ps.pose)
 
-        o.operation = o.ADD
+    ## @brief Insert new cube to planning scene
+    ## @param wait When true, we wait for planning scene to actually update,
+    ##             this provides immunity against lost messages.
+    def addCube(self, name, size, x, y, z, wait = True):
+    def addCube(self, name, size, x, y, z, wait = True):
+        self.addBox(name, size, size, size, x, y, z, wait)
 
-        self._pub.publish(o)
-        while not name in self.getKnownCollisionObjects():
-            rospy.logdebug('Waiting for object to add')
-            self._pub.publish(o)
-            rospy.sleep(1.0)
-
-    def addCube(self, name, size, x, y, z):
-        self.addBox(name, size, size, size, x, y, z)
-
-    def remove(self, name):
+    ## @brief Send message to remove object
+    ## @param wait When true, we wait for planning scene to actually update,
+    ##             this provides immunity against lost messages.
+    def remove(self, name, wait = True):
         """ Remove a an object. """
         o = CollisionObject()
         o.header.stamp = rospy.Time.now()
@@ -345,12 +383,18 @@ class ObjectManager:
         o.id = name
         o.operation = o.REMOVE
 
+        try:
+            del self._objects[name]
+        except KeyError:
+            pass
+
         self._pub.publish(o)
-        while name in self.getKnownCollisionObjects():
+        while wait and name in self.getKnownCollisionObjects():
             rospy.logdebug('Waiting for object to remove')
             self._pub.publish(o)
-            rospy.sleep(1.0)
+            rospy.sleep(0.1)
 
+    ## @brief Update the object lists from a PlanningScene message
     def sceneCb(self, msg):
         """ Recieve updates from move_group. """
         self._mutex.acquire()
@@ -370,17 +414,42 @@ class ObjectManager:
             self._attached.append(obj.object.id)
         self._mutex.release()
 
+    ## @brief Get a list of names of collision objects
     def getKnownCollisionObjects(self):
         self._mutex.acquire()
         l = copy.deepcopy(self._collision)
         self._mutex.release()
         return l
 
+    ## @brief Get a list of names of attached objects
     def getKnownAttachedObjects(self):
         self._mutex.acquire()
         l = copy.deepcopy(self._attached)
         self._mutex.release()
         return l
+
+    ## @brief Wait for sync
+    def waitForSync(self, max_time = 10.0):
+        sync = False
+        t = rospy.Time.now()
+        while not sync:
+            sync = True
+            # delete objects that should be gone
+            for name in self._collision + self._attached:
+                if name not in self._objects.keys():
+                    # should be removed, is not
+                    self.remove(name, False)
+                    sync = False
+            # add missing objects
+            for name in self._objects.keys():
+                if name not in self._collision + self._attached:
+                    self._pub.publish(self._objects[name])
+                    sync = False
+            # timeout
+            if rospy.Time.now() - t > rospy.Duration(max_time):
+                rospy.logerr('ObjectManager: sync timed out.')
+                break
+            rospy.sleep(0.1)
 
 class ArmPlanner:
 
@@ -588,7 +657,8 @@ if __name__=='__main__':
                 p.pose.position.y = SQUARE_SIZE*(0.5+y)
                 p.pose.position.z = 0.03
                 p_transformed = listener.transformPose(FIXED_FRAME, p)
-                obj.addCube(chr(97+x)+str(y+1), 0.015, p_transformed.pose.position.x, p_transformed.pose.position.y, p_transformed.pose.position.z)
+                obj.addCube(chr(97+x)+str(y+1), 0.015, p_transformed.pose.position.x, p_transformed.pose.position.y, p_transformed.pose.position.z, wait=False)
+        obj.waitForSync()
 
     if 1:
         import time
