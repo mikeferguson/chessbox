@@ -61,7 +61,7 @@ class ChessPerception
             fixed_frame_ = "base_link";
 
         /* Subscribe to just the cloud now */
-        cloud_sub_ = nh_.subscribe("/camera/depth_registered/points", 1, &ChessPerception::cameraCallback, this);
+        cloud_sub_ = nh_.subscribe("/head_camera/depth_registered/points", 1, &ChessPerception::cameraCallback, this);
         output_ = nh_.advertise<chess_msgs::ChessBoard>("chess_board_state", 1);
 
         /* Periodic callback to publish tf */
@@ -71,7 +71,7 @@ class ChessPerception
     /** \brief Main loop */
     void cameraCallback ( pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud )
     {
-        if(frames_++ % skip_ != 0) return;
+        if (frames_++ % skip_ != 0) return;
 
         tf::StampedTransform tr2;
         try
@@ -102,7 +102,7 @@ class ChessPerception
         std::vector<pcl::PointXYZ> pieces;
         std::vector<double> weights;
         int piece_count = piece_finder_.findPieces(cloud, tr, pieces, weights);
-        if(piece_count == 0)
+        if (piece_count == 0)
         {
             ROS_WARN_THROTTLE(1,"Unable to detect pieces.");
             return;

@@ -14,7 +14,7 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software Foundation,
-Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA 
+Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 **/
 
@@ -61,7 +61,7 @@ PieceFinder::PieceFinder() : square_size_(0.05715)
     if (!nh.getParam ("color_threshold", threshold_))
         threshold_ = 70;
 
-    if(debug_)
+    if (debug_)
     {
         pieces_cloud_pub_ = nh.advertise< pcl::PointCloud<pcl::PointXYZRGB> >("pieces", 1);
     }
@@ -161,7 +161,7 @@ int PieceFinder::findPieces(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
         y = y/clusters[c].indices.size();
         z = z/clusters[c].indices.size();
         color = color/clusters[c].indices.size();
-        
+
         /* outputs */
         pcl::PointXYZ p(x,y,z);
         double weight = clusters[c].indices.size();
@@ -170,7 +170,9 @@ int PieceFinder::findPieces(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
 
         /* check if cluster overlaps any other */
         int index = (int)(x/square_size_) + 8 * (int)(y/square_size_);
-        if(cluster_index[index].size() == 0)
+        if (index >= cluster_index.size())
+            continue;
+        if (cluster_index[index].size() == 0)
         {
             /* is new */
             pieces.push_back(p);
@@ -189,9 +191,10 @@ int PieceFinder::findPieces(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
             cluster_index[index].push_back(c);
         }
     }
+
     ROS_DEBUG_STREAM("Piece Finder: Found " << weights.size() << " clusters.");
 
-    if(debug_)
+    if (debug_)
     {
         pcl::PointCloud<pcl::PointXYZRGB> cluster_cloud;
         cluster_cloud.header = cloud_transformed->header;
