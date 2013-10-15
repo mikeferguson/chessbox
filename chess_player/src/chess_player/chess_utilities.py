@@ -25,6 +25,7 @@ import threading
 
 from chess_msgs.msg import *
 from geometry_msgs.msg import Pose, PoseStamped
+from moveit_msgs.msg import *
 
 from chess_player.robot_defs import *
 
@@ -40,11 +41,6 @@ from tf.listener import *
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
 SQUARE_SIZE = 0.05715
-
-# This is used for a capture
-OFF_BOARD_X = -SQUARE_SIZE
-OFF_BOARD_Y = -SQUARE_SIZE
-OFF_BOARD_Z = 0.10
 
 # extra move to be made for castling
 castling_extras = { "e1c1" : "a1d1",
@@ -194,6 +190,7 @@ class BoardState:
             self.side = self.WHITE   # good to go
         else:
             self.side = self.BLACK
+        self.last_move = "go"
 
     def setupSide(self):
         # need to setup board
@@ -222,8 +219,6 @@ class BoardState:
 
         self.values = temp_board.values
         self.printBoard()
-
-        self.last_move = "go"
 
     #######################################################
     # helpers
@@ -554,7 +549,7 @@ class GnuChessEngine:
 class ChessArmPlanner:
 
     # This is a bit hacky, basically I'm making the "table" thick, and not adding individual chess pieces
-    BOARD_THICKNESS = 0.2
+    BOARD_THICKNESS = 0.1
     CHESS_BOARD_FRAME = 'chess_board'
 
     """ Chess-specific stuff """
@@ -620,7 +615,7 @@ class ChessArmPlanner:
         places = []
         for y in [-1.57, -0.78, 0, 0.78, 1.57]:
             for p in [0, 0.2, -0.2, 0.4, -0.4]:
-                q = quaternion_from_euler(0, 1.57-p, y)
+                q = quaternion_from_euler(0, p, y)  # now in object frame
                 l.place_pose.pose.orientation.x = q[0]
                 l.place_pose.pose.orientation.y = q[1]
                 l.place_pose.pose.orientation.z = q[2]
@@ -656,11 +651,28 @@ class ChessArmPlanner:
         self._obj.waitForSync()
 
         # pick it up
-        rospy.loginfo('Picking piece')
         grasps = self.make_grasps(pt)
-        if not self._grasp.pickup('piece', grasps):
-            # TODO?
-            return False
+        while True:
+            result = self._grasp.pickup('piece', grasps)
+            if result == MoveItErrorCodes.SUCCESS:
+                rospy.loginfo('Pick succeeded')
+                break
+            elif result == MoveItErrorCodes.PLANNING_FAILED:
+                rospy.logerr('Pick failed in the planning stage, try again...')
+                rospy.sleep(0.5)  # short sleep to try and let state settle a bit?
+                continue
+            elif result == MoveItErrorCodes.CONTROL_FAILED or \
+                 result == MoveItErrorCodes.MOTION_PLAN_INVALIDATED_BY_ENVIRONMENT_CHANGE:
+                rospy.logerr('Pick failed during execution, attempting to cleanup.')
+                if 'piece' in self._obj.getKnownAttachedObjects():
+                    rospy.loginfo('Pick managed to grab piece, retreat must have failed, continuing anyways')
+                    break
+                else:
+                    rospy.loginfo('Pick did not grab piece, try again...')
+                    continue
+            else:
+                rospy.logerr('Pick failed with error code: %d.' % result)
+                return False
 
         # put it down
         rospy.loginfo('Placing piece')
@@ -671,9 +683,27 @@ class ChessArmPlanner:
         pt = self._listener.transformPose(FIXED_FRAME, p)
 
         places = self.make_places(pt)
-        if not self._grasp.place('piece', places):
-            # TODO Handle place failure
-            return False
+        while True:
+            result = self._grasp.place('piece', places, goal_is_eef = True)
+            if result == MoveItErrorCodes.SUCCESS:
+                rospy.loginfo('Place succeeded')
+                break
+            elif result == MoveItErrorCodes.PLANNING_FAILED:
+                rospy.logerr('Place failed in the planning stage, try again...')
+                rospy.sleep(0.5)  # short sleep to try and let state settle a bit?
+                continue
+            elif result == MoveItErrorCodes.CONTROL_FAILED or \
+                 result == MoveItErrorCodes.MOTION_PLAN_INVALIDATED_BY_ENVIRONMENT_CHANGE:
+                rospy.logerr('Place failed during execution, attempting to cleanup.')
+                if 'piece' in self._obj.getKnownAttachedObjects():
+                    rospy.loginfo('Place did not place object, approach must have failed, will retry...')
+                    continue
+                else:
+                    rospy.loginfo('Object no longer in gripper, must be placed, continuing...')
+                    break
+            else:
+                rospy.logerr('Place failed with error code: %d.' % result)
+                return False
 
         return True
 

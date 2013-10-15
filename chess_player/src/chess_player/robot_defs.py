@@ -49,6 +49,14 @@ if ROBOT_NAME == "maxwell":
     head_pose_look_at_board = [0.0, 1.15]
     head_pose_look_at_player = [0.0, 0.0]
 
+    gripper_joint_names = ['l_gripper_joint, r_gripper_joint']
+    gripper_effort = [1.0, 1.0]
+
+    # This is used for a capture
+    OFF_BOARD_X = -SQUARE_SIZE
+    OFF_BOARD_Y = -SQUARE_SIZE
+    OFF_BOARD_Z = 0.10
+
 elif ROBOT_NAME == "that_other_bot":
     GROUP_NAME_ARM = 'arm'
     GROUP_NAME_GRIPPER = 'gripper'
@@ -78,3 +86,8 @@ elif ROBOT_NAME == "that_other_bot":
 
     gripper_joint_names = ['left_gripper_joint', 'right_gripper_joint']
     gripper_effort = [28.0, 28.0]
+
+    # This is used for a capture
+    OFF_BOARD_X = 10 * SQUARE_SIZE
+    OFF_BOARD_Y = 4 * SQUARE_SIZE
+    OFF_BOARD_Z = 0.10

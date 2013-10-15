@@ -19,6 +19,8 @@ from moveit_utils.grasping_interface import GraspingInterface
 from moveit_utils.object_interface import ObjectInterface
 
 
+
+
 if __name__=='__main__':
     rospy.init_node('test_chess_grasping')
     grasp = GraspingInterface(GROUP_NAME_ARM, GROUP_NAME_GRIPPER)
@@ -120,9 +122,26 @@ if __name__=='__main__':
             p_transformed = listener.transformPose(FIXED_FRAME, p)
             grasps = planner.make_grasps(p_transformed)
 
-            if not grasp.pickup(col+"2", grasps):
-                # retry?
-                if not grasp.pickup(col+"2", grasps):
+            while True:
+                result = grasp.pickup(col+"2", grasps)
+                if result == MoveItErrorCodes.SUCCESS:
+                    rospy.loginfo('Pick succeeded')
+                    break
+                elif result == MoveItErrorCodes.PLANNING_FAILED:
+                    rospy.logerr('Pick failed in the planning stage, try again...')
+                    rospy.sleep(0.5)  # short sleep to try and let state settle a bit?
+                    continue
+                elif result == MoveItErrorCodes.CONTROL_FAILED or \
+                     result == MoveItErrorCodes.MOTION_PLAN_INVALIDATED_BY_ENVIRONMENT_CHANGE:
+                    rospy.logerr('Pick failed during execution, attempting to cleanup.')
+                    if col+"2" in obj.getKnownAttachedObjects():
+                        rospy.loginfo('Pick managed to grab piece, retreat must have failed, continuing anyways')
+                        break
+                    else:
+                        rospy.loginfo('Pick did not grab piece, try again...')
+                        continue
+                else:
+                    rospy.logerr('Pick failed with error code: %d.' % result)
                     continue
 
             # transform place to fixed frame and form place message
@@ -132,11 +151,27 @@ if __name__=='__main__':
             place_transformed = listener.transformPose(FIXED_FRAME, p)
             places = planner.make_places(place_transformed)
 
-            if not grasp.place(col+"2", places, goal_is_eef = True):
-                print("failed to place, replacing piece where it started")
-                places = planner.make_places(p_transformed)
-                if not grasp.place(col+"2", places, goal_is_eef = True):
+            while True:
+                result = grasp.place(col+"2", places) #goal_is_eef = True)
+                if result == MoveItErrorCodes.SUCCESS:
+                    rospy.loginfo('Place succeeded')
                     break
+                elif result == MoveItErrorCodes.PLANNING_FAILED:
+                    rospy.logerr('Place failed in the planning stage, try again...')
+                    rospy.sleep(0.5)  # short sleep to try and let state settle a bit?
+                    continue
+                elif result == MoveItErrorCodes.CONTROL_FAILED or \
+                     result == MoveItErrorCodes.MOTION_PLAN_INVALIDATED_BY_ENVIRONMENT_CHANGE:
+                    rospy.logerr('Place failed during execution, attempting to cleanup.')
+                    if col+"2" in obj.getKnownAttachedObjects():
+                        rospy.loginfo('Place did not place object, approach must have failed, will retry...')
+                        continue
+                    else:
+                        rospy.loginfo('Object no longer in gripper, must be placed, continuing...')
+                        break
+                else:
+                    rospy.logerr('Place failed with error code: %d.' % result)
+                    continue
 
             # move arm to side to percieve a bit
             print("move arm to side")

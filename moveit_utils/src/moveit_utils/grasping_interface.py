@@ -33,6 +33,7 @@ class GraspingInterface:
     ## @param name Name of the object to grasp
     ## @param grasps Grasps to try (moveit_msgs/Grasp)
     ## @param support_name Name of the support surface
+    ## @returns Error code from MoveIt! (type: MoveItErrorCodes)
     def pickup(self, name, grasps, support_name = 'table',
                allow_gripper_support_collision = True,
                allowed_touch_objects = list()):
@@ -53,11 +54,7 @@ class GraspingInterface:
         g.planning_options.plan_only = self._plan_only
         self._pick_action.send_goal(g)
         self._pick_action.wait_for_result()
-        if self._pick_action.get_result().error_code.val == MoveItErrorCodes.SUCCESS:
-            rospy.loginfo("Pick succeeded")
-            return True
-        rospy.loginfo("Pick failed")
-        return False
+        return self._pick_action.get_result().error_code.val
 
     ## @brief Plan and grasp something
     ## @param name Name of the object to grasp
@@ -65,6 +62,7 @@ class GraspingInterface:
     ## @param support_name Name of the support surface
     ## @param goal_is_eef Set to true if the place goal is for the
     ##        end effector frame, default is object frame.
+    ## @returns Error code from MoveIt! (type: MoveItErrorCodes)
     def place(self, name, locations, support_name = 'table',
               allow_gripper_support_collision = True,
               allowed_touch_objects = list(),
@@ -84,9 +82,5 @@ class GraspingInterface:
         g.planning_options.plan_only = self._plan_only
         self._place_action.send_goal(g)
         self._place_action.wait_for_result()
-        if self._place_action.get_result().error_code.val == MoveItErrorCodes.SUCCESS:
-            rospy.loginfo("Place succeeded")
-            return True
-        rospy.loginfo("Place failed")
-        return False
+        return self._place_action.get_result().error_code.val
 

@@ -120,9 +120,9 @@ class ChessExecutive:
             self.updateBoardState(True)
         if self.board.side == None:
             self.board.computeSide()
-        self.board.setupSide()
 
         if self.board.side == self.board.BLACK:
+            self.board.setupSide()
             self.head.look_at_player()
             self.speech.say("Ok, I'll play black")
             # wait for opponents move
@@ -180,31 +180,7 @@ class ChessExecutive:
         self.board.printBoard()
 
     def getMove(self):
-        move = self.engine.nextMove(self.board.last_move, self.board)
-        return move
-        # TODO: remove all of the following getReach garbage
-        # check length of move
-        if move != None:
-            if move in castling_extras.keys():
-                # asked to castle!
-                m = castling_extras[move]
-                reach = self.planner.getReach(m[0], m[1], self.board) 
-                if reach > 0.45 and not self.interactive:
-                    rospy.loginfo("Move " + m + ", source has reach of " + str(reach) + ", starting to pawn")
-                    self.engine.startPawning()
-                    return self.engine.nextMove(self.board.last_move, self.board)        
-                reach = self.planner.getReach(m[2], m[3], self.board) 
-                if reach > 0.45 and not self.interactive:
-                    rospy.loginfo("Move " + m + ", destination has reach of " + str(reach) + ", starting to pawn")
-                    self.engine.startPawning()
-                    return self.engine.nextMove(self.board.last_move, self.board)   
-
-            reach = self.planner.getReach(move[2], move[3], self.board) 
-            if reach > 0.45 and not self.interactive:
-                rospy.loginfo("Move " + move + " has reach of " + str(reach) + ", starting to pawn")
-                self.engine.startPawning()
-                return self.engine.nextMove(self.board.last_move, self.board)            
-        return move
+        return self.engine.nextMove(self.board.last_move, self.board)
 
 if __name__=="__main__":
     sim = False
