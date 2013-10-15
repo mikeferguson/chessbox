@@ -19,86 +19,19 @@ from moveit_utils.grasping_interface import GraspingInterface
 from moveit_utils.object_interface import ObjectInterface
 
 
-def make_simple_grasp(pose_stamped, name="test"):
-    g = Grasp()
-    g.id = name
-
-    t = JointTrajectory()
-    t.joint_names = ['left_gripper_joint', 'right_gripper_joint']
-    tp = JointTrajectoryPoint()
-    tp.positions = [0.01, 0.01]
-    tp.effort = [28.0, 28.0]
-    t.points.append(tp)
-    g.pre_grasp_posture = t
-
-    t = JointTrajectory()
-    t.joint_names = ['left_gripper_joint', 'right_gripper_joint']
-    tp = JointTrajectoryPoint()
-    tp.positions = [0.0, 0.0]
-    tp.effort = [28.0, 28.0]
-    t.points.append(tp)
-    g.grasp_posture = t
-
-    g.grasp_pose = pose_stamped
-    g.grasp_quality = 1.0
-
-    gt = GripperTranslation()
-    gt.direction.vector.x = 1.0
-    gt.direction.header.frame_id = 'gripper_link'
-    gt.min_distance = 0.1
-    gt.desired_distance = 0.15
-    g.pre_grasp_approach = gt
-
-    gt = GripperTranslation()
-    gt.direction.vector.x = -1.0
-    gt.direction.header.frame_id = 'gripper_link'
-    gt.min_distance = 0.1
-    gt.desired_distance = 0.15
-    g.post_grasp_retreat = gt
-
-    return g
-
-def make_simple_place(pose_stamped, name="test"):
-    l = PlaceLocation()
-    l.id = name
-
-    l.place_pose = pose_stamped
-
-    t = JointTrajectory()
-    t.joint_names = ['left_gripper_joint', 'right_gripper_joint']
-    tp = JointTrajectoryPoint()
-    tp.positions = [0.0125, 0.0125] # max of 0.045
-    tp.effort = [28.0, 28.0]
-    t.points.append(tp)
-    l.post_place_posture = t
-
-    gt = GripperTranslation()
-    gt.direction.vector.x = 1.0
-    gt.direction.header.frame_id = 'gripper_link'
-    gt.min_distance = 0.1
-    gt.desired_distance = 0.15
-    l.pre_place_approach = gt
-
-    gt = GripperTranslation()
-    gt.direction.vector.x = -1.0
-    gt.direction.header.frame_id = 'gripper_link'
-    gt.min_distance = 0.1
-    gt.desired_distance = 0.15
-    l.post_place_retreat = gt
-
-    return l
-
 if __name__=='__main__':
     rospy.init_node('test_chess_grasping')
     grasp = GraspingInterface(GROUP_NAME_ARM, GROUP_NAME_GRIPPER)
     obj = ObjectInterface(FIXED_FRAME)
     listener = TransformListener()
-    move = ArmInterface('arm', FIXED_FRAME, listener)
+    move = ArmInterface(GROUP_NAME_ARM, FIXED_FRAME, listener)
+
+    planner = ChessArmPlanner()
 
     # need time for listener to get data
     rospy.sleep(3.0)
 
-    #move.moveToJointPosition(joint_names, joints_ready)
+    move.moveToJointPosition(joint_names, joints_ready)
 
     ####################################################
     # this code will display the grasp pose array
@@ -183,97 +116,31 @@ if __name__=='__main__':
             p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
             p.pose.position.x = SQUARE_SIZE * (0.5 + i)
             p.pose.position.y = SQUARE_SIZE * (0.5 + 1)
-            p.pose.position.z = 0.03
-            q = quaternion_from_euler(0.0, 1.77, 0.78)
-            p.pose.orientation.x = q[0]
-            p.pose.orientation.y = q[1]
-            p.pose.orientation.z = q[2]
-            p.pose.orientation.w = q[3]
+            p.pose.position.z = 0.0375
             p_transformed = listener.transformPose(FIXED_FRAME, p)
-            g = make_simple_grasp(p_transformed)
+            grasps = planner.make_grasps(p_transformed)
 
-            if not grasp.pickup(col+"2", [g, ]):
+            if not grasp.pickup(col+"2", grasps):
                 # retry?
-                if not grasp.pickup(col+"2", [g, ]):
-                    break
+                if not grasp.pickup(col+"2", grasps):
                     continue
-            print("sleep before place")
-            rospy.sleep(2.0)
 
             # transform place to fixed frame and form place message
             p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
-            p.pose.position.y = SQUARE_SIZE * (0.5 + 1) + SQUARE_SIZE*2
-            q = quaternion_from_euler(0.0, 1.77, 0.0)
-            p.pose.orientation.x = q[0]
-            p.pose.orientation.y = q[1]
-            p.pose.orientation.z = q[2]
-            p.pose.orientation.w = q[3]
+            p.pose.position.y = SQUARE_SIZE * (0.5 + 3)
+            p.pose.position.z = 0.04
             place_transformed = listener.transformPose(FIXED_FRAME, p)
-            place = make_simple_place(place_transformed)
+            places = planner.make_places(place_transformed)
 
-            if not grasp.place(col+"2", [place,], goal_is_eef = True):
+            if not grasp.place(col+"2", places, goal_is_eef = True):
                 print("failed to place, replacing piece where it started")
-                place = make_simple_place(p_transformed)
-                if not grasp.place(col+"2", [place,], goal_is_eef = True):
+                places = planner.make_places(p_transformed)
+                if not grasp.place(col+"2", places, goal_is_eef = True):
                     break
 
+            # move arm to side to percieve a bit
+            print("move arm to side")
             move.moveToJointPosition(joint_names, joints_ready)
             rospy.sleep(1)
+
             i+=1
-
-        print("elapsed time: ", time.time() - t)
-
-        exit(0)
-        # move back row forward
-        i = 0
-        for col in 'abcdefgh':
-            print(col+"1")
-            # manipulate a part
-            p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
-            p.pose.position.x = SQUARE_SIZE * (0.5 + i)
-            p.pose.position.y = SQUARE_SIZE * (0.5)
-            p_transformed = listener.transformPose(FIXED_FRAME, p)
-
-            if not pick.pickup(col+"1", p_transformed):
-                # retry?
-                if not pick.pickup(col+"1", p_transformed):
-                    continue
-            rospy.sleep(1.0)
-
-            p_transformed.pose.position.x += SQUARE_SIZE*2
-            if not place.place(col+"1", p_transformed):
-                print("failed to place, replacing piece where it started")
-                p_transformed.pose.position.x -= SQUARE_SIZE*2
-                place.place(col+"1", p_transformed)
-
-            move.moveToJointPosition(joint_names, joints_ready)
-            rospy.sleep(1)
-            i+=1
-        print("elapsed time: ", time.time() - t)
-
-        i = 0
-        for col in 'abcdefgh':
-            print(col+"2")
-            # manipulate a part
-            p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
-            p.pose.position.x = SQUARE_SIZE * (0.5 + i)
-            p.pose.position.y = SQUARE_SIZE * (0.5 + 3)
-            p_transformed = listener.transformPose(FIXED_FRAME, p)
-
-            if not pick.pickup(col+"2", p_transformed):
-                # retry?
-                if not pick.pickup(col+"2", p_transformed):
-                    continue
-            rospy.sleep(1.0)
-
-            p_transformed.pose.position.y += SQUARE_SIZE*2
-            if not place.place(col+"2", p_transformed):
-                print("failed to place, replacing piece where it started")
-                p_transformed.pose.position.y -= SQUARE_SIZE*2
-                place.place(col+"2", p_transformed)
-
-            move.moveToJointPosition(joint_names, joints_ready)
-            rospy.sleep(1)
-            i+=1
-        print("elapsed time: ", time.time() - t)
-

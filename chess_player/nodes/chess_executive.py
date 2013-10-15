@@ -30,7 +30,6 @@ from std_srvs.srv import *
 from tf.listener import *
 
 from chess_player.chess_utilities import *
-from chess_player.grasp_utilities import *
 from chess_player.sound_utilities import *
 from chess_player.head_utilities import *
 
@@ -47,7 +46,7 @@ class ChessExecutive:
 
         # get arm planner
         rospy.loginfo('exec: Waiting for actions to connect.')
-        self.planner = ArmPlanner( listener = self.listener )
+        self.planner = ChessArmPlanner(listener = self.listener)
 
         self.board = BoardState()
 
@@ -182,6 +181,8 @@ class ChessExecutive:
 
     def getMove(self):
         move = self.engine.nextMove(self.board.last_move, self.board)
+        return move
+        # TODO: remove all of the following getReach garbage
         # check length of move
         if move != None:
             if move in castling_extras.keys():

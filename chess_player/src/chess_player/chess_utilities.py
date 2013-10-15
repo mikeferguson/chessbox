@@ -18,6 +18,7 @@
   Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 """
 
+import copy, math
 import rospy    # for logging
 import pexpect  # for connecting to gnu chess
 import threading
@@ -25,11 +26,25 @@ import threading
 from chess_msgs.msg import *
 from geometry_msgs.msg import Pose, PoseStamped
 
-import math
-import tf
+from chess_player.robot_defs import *
+
+from moveit_utils.arm_interface import ArmInterface
+from moveit_utils.grasping_interface import GraspingInterface
+from moveit_utils.object_interface import ObjectInterface
+
+from geometry_msgs.msg import PoseStamped
+from moveit_msgs.msg import Grasp, GripperTranslation, PlaceLocation
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+
+from tf.listener import *
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
 SQUARE_SIZE = 0.05715
+
+# This is used for a capture
+OFF_BOARD_X = -SQUARE_SIZE
+OFF_BOARD_Y = -SQUARE_SIZE
+OFF_BOARD_Z = 0.10
 
 # extra move to be made for castling
 castling_extras = { "e1c1" : "a1d1",
@@ -327,10 +342,7 @@ class BoardState:
         else:
             return None
 
-
-
-class BoardUpdater():
-
+class BoardUpdater:
     def __init__(self, board, listener):
         self.board = board
         self.listener = listener
@@ -538,4 +550,191 @@ class GnuChessEngine:
         for h in self.history:
             print h
         self.engine.sendline('exit')
+
+class ChessArmPlanner:
+
+    # This is a bit hacky, basically I'm making the "table" thick, and not adding individual chess pieces
+    BOARD_THICKNESS = 0.2
+    CHESS_BOARD_FRAME = 'chess_board'
+
+    """ Chess-specific stuff """
+    def __init__(self, listener = None):
+        self._grasp = GraspingInterface(GROUP_NAME_ARM, GROUP_NAME_GRIPPER)
+        self._obj = ObjectInterface(FIXED_FRAME)
+        self._listener = listener
+        if self._listener == None:
+            self._listener = TransformListener()
+        self._move = ArmInterface(GROUP_NAME_ARM, FIXED_FRAME, self._listener)
+        self.success = True
+
+    # Get the gripper posture as a JointTrajectory
+    def make_gripper_posture(self, pose):
+        t = JointTrajectory()
+        t.joint_names = gripper_joint_names
+        tp = JointTrajectoryPoint()
+        tp.positions = [pose/2.0 for j in t.joint_names]
+        tp.effort = gripper_effort
+        t.points.append(tp)
+        return t
+
+    def make_gripper_translation(self, min_dist, desired, axis=1.0):
+        g = GripperTranslation()
+        g.direction.vector.x = axis
+        g.direction.header.frame_id = GRIPPER_FRAME
+        g.min_distance = min_dist
+        g.desired_distance = desired
+        return g
+
+    def make_grasps(self, pose_stamped):
+        # setup defaults of grasp
+        g = Grasp()
+        g.pre_grasp_posture = self.make_gripper_posture(GRIPPER_OPEN)
+        g.grasp_posture = self.make_gripper_posture(GRIPPER_CLOSED)
+        g.pre_grasp_approach = self.make_gripper_translation(0.1, 0.15)
+        g.post_grasp_retreat = self.make_gripper_translation(0.1, 0.15, -1.0)
+        g.grasp_pose = pose_stamped
+
+        # generate list of grasps
+        grasps = []
+        for y in [-1.57, -0.78, 0, 0.78, 1.57]:
+            for p in [0, 0.2, -0.2, 0.4, -0.4]:
+                q = quaternion_from_euler(0, 1.57-p, y)
+                g.grasp_pose.pose.orientation.x = q[0]
+                g.grasp_pose.pose.orientation.y = q[1]
+                g.grasp_pose.pose.orientation.z = q[2]
+                g.grasp_pose.pose.orientation.w = q[3]
+                g.id = str(len(grasps))
+                g.grasp_quality = 1.0 - abs(p/2.0)
+                grasps.append(copy.deepcopy(g))
+        return grasps
+
+    def make_places(self, pose_stamped):
+        # setup default of place location
+        l = PlaceLocation()
+        l.post_place_posture = self.make_gripper_posture(GRIPPER_OPEN)
+        l.pre_place_approach = self.make_gripper_translation(0.1, 0.15)
+        l.post_place_retreat = self.make_gripper_translation(0.1, 0.15, -1.0)
+        l.place_pose = pose_stamped
+
+        # generate list of place locations
+        places = []
+        for y in [-1.57, -0.78, 0, 0.78, 1.57]:
+            for p in [0, 0.2, -0.2, 0.4, -0.4]:
+                q = quaternion_from_euler(0, 1.57-p, y)
+                l.place_pose.pose.orientation.x = q[0]
+                l.place_pose.pose.orientation.y = q[1]
+                l.place_pose.pose.orientation.z = q[2]
+                l.place_pose.pose.orientation.w = q[3]
+                l.id = str(len(places))
+                places.append(copy.deepcopy(l))
+        return places
+
+    def move_piece(self, start_pose, end_pose):
+        # update table
+        rospy.loginfo('Updating table position')
+        self._obj.remove('table')
+        p = PoseStamped()
+        # back date header.stamp as perception can be slow
+        p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
+        p.header.frame_id = self.CHESS_BOARD_FRAME
+        p.pose.position.x = SQUARE_SIZE * 4
+        p.pose.position.y = SQUARE_SIZE * 4
+        p.pose.position.z = 0
+        p.pose.orientation.x = p.pose.orientation.y = p.pose.orientation.z = 0.0
+        p.pose.orientation.w = 1.0
+        pt = self._listener.transformPose(FIXED_FRAME, p)
+        self._obj.addBox('table', SQUARE_SIZE * 8, SQUARE_SIZE * 8, self.BOARD_THICKNESS,
+                         pt.pose.position.x, pt.pose.position.y, pt.pose.position.z, wait=False)
+        # insert piece
+        rospy.loginfo('Updating piece position')
+        p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
+        p.pose.position.x = start_pose.position.x
+        p.pose.position.y = start_pose.position.y
+        p.pose.position.z = 0.0375 #0.045
+        pt = self._listener.transformPose(FIXED_FRAME, p)
+        self._obj.addCube('piece', 0.015, pt.pose.position.x, pt.pose.position.y, pt.pose.position.z, wait=False)
+        self._obj.waitForSync()
+
+        # pick it up
+        rospy.loginfo('Picking piece')
+        grasps = self.make_grasps(pt)
+        if not self._grasp.pickup('piece', grasps):
+            # TODO?
+            return False
+
+        # put it down
+        rospy.loginfo('Placing piece')
+        p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
+        p.pose.position.x = end_pose.position.x
+        p.pose.position.y = end_pose.position.y
+        p.pose.position.z = 0.04 #0.045
+        pt = self._listener.transformPose(FIXED_FRAME, p)
+
+        places = self.make_places(pt)
+        if not self._grasp.place('piece', places):
+            # TODO Handle place failure
+            return False
+
+        return True
+
+    def execute(self, move, board):
+        """ Execute a move. """
+
+        # get info about move
+        (col_f, rank_f) = board.toPosition(move[0:2])
+        (col_t, rank_t) = board.toPosition(move[2:])
+        fr = board.getPiece(col_f, rank_f)
+        to = board.getPiece(col_t, rank_t)
+
+        # is this a capture?
+        if to != None:
+            off_board = ChessPiece()
+            off_board.header.frame_id = fr.header.frame_id
+            off_board.pose.position.x = OFF_BOARD_X
+            off_board.pose.position.y = OFF_BOARD_Y
+            off_board.pose.position.z = OFF_BOARD_Z
+            if not self.move_piece(to.pose, off_board.pose):
+                rospy.logerr('Failed to move captured piece')
+                self.success = False
+                self.tuck()
+                return None
+
+        to = ChessPiece()
+        to.header.frame_id = fr.header.frame_id
+        to.pose = self.getPose(col_t, rank_t, board, fr.pose.position.z)
+        if not self.move_piece(fr.pose, to.pose):
+            rospy.logerr('Failed to move my piece')
+            self.success = False
+            self.tuck()
+            return None
+
+        if move in castling_extras:
+            if not self.execute(castling_extras[move],board):
+                rospy.logerr('Failed to carry out castling extra')
+
+        self.tuck()
+        return to.pose
+
+    def getPose(self, col, rank, board, z=0):
+        """ Find the reach required to get to a position """
+        p = Pose()
+        if board.side == board.WHITE:
+            p.position.x = (col * SQUARE_SIZE) + SQUARE_SIZE/2
+            p.position.y = ((rank-1) * SQUARE_SIZE) + SQUARE_SIZE/2
+            p.position.z = z
+        else:
+            p.position.x = ((7-col) * SQUARE_SIZE) + SQUARE_SIZE/2
+            p.position.y = ((8-rank) * SQUARE_SIZE) + SQUARE_SIZE/2
+            p.position.z = z
+        return p
+
+    def tuck(self):
+        if joints_tucked:
+            self._move.moveToJointPosition(joint_names, joints_tucked)
+        else:
+            self._move.moveToJointPosition(joint_names, joints_ready)
+
+    def untuck(self):
+        if joints_untucked:
+            self._move.moveToJointPosition(joint_names, joints_untucked)
 

@@ -22,7 +22,7 @@
 import sys
 import rospy
 
-from chess_player.grasp_utilities import ArmPlanner
+from chess_player.chess_utilities import ArmPlanner
 
 if __name__=='__main__':
     rospy.init_node('tuck_arm')
