@@ -1,8 +1,4 @@
 """
-An easy interface for managing objects in MoveIt!
-"""
-
-"""
   Copyright (c) 2011-2013 Michael E. Ferguson. All right reserved.
 
   This program is free software; you can redistribute it and/or modify
@@ -29,8 +25,6 @@ from geometry_msgs.msg import *
 from moveit_msgs.msg import *
 from moveit_msgs.srv import *
 from shape_msgs.msg import *
-
-# TODO: Add a 'addCylinder' function
 
 ## @brief A class for managing the state of the objects in the planning scene
 ## @param frame The fixed frame in which planning is being done (needs to be part of robot?)
@@ -88,6 +82,23 @@ class ObjectInterface:
             rospy.logdebug('Waiting for object to add')
             self._pub.publish(o)
             rospy.sleep(0.1)
+
+    ## @brief Insert new cylinder into planning scene
+    ## @param wait When true, we wait for planning scene to actually update,
+    ##             this provides immunity against lost messages.
+    def addCylinder(self, name, height, radius, x, y, z, wait = True):
+        s = SolidPrimitive()
+        s.dimensions = [height, radius]
+        s.type = s.CYLINDER
+
+        ps = PoseStamped()
+        ps.header.frame_id = self._fixed_frame
+        ps.pose.position.x = x
+        ps.pose.position.y = y
+        ps.pose.position.z = z
+        ps.pose.orientation.w = 1.0
+
+        self.addSolidPrimitive(name, s, ps.pose, wait)
 
     ## @brief Insert new box into planning scene
     ## @param wait When true, we wait for planning scene to actually update,

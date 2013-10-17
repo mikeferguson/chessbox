@@ -1,8 +1,4 @@
 """
-Interface to MoveIt! pick&place
-"""
-
-"""
   Copyright (c) 2011-2013 Michael E. Ferguson. All right reserved.
 
   This program is free software; you can redistribute it and/or modify
