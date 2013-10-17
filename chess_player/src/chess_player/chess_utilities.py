@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-  Copyright (c) 2011 Michael E. Ferguson. All right reserved.
+  Copyright (c) 2011-2013 Michael E. Ferguson. All right reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -652,7 +652,12 @@ class ChessArmPlanner:
 
         # pick it up
         grasps = self.make_grasps(pt)
+        attempts = 0
         while True:
+            # limit retries before we abort
+            if attempts > 10:
+                return False
+            # attempt grasp
             result = self._grasp.pickup('piece', grasps)
             if result == MoveItErrorCodes.SUCCESS:
                 rospy.loginfo('Pick succeeded')
@@ -660,6 +665,7 @@ class ChessArmPlanner:
             elif result == MoveItErrorCodes.PLANNING_FAILED:
                 rospy.logerr('Pick failed in the planning stage, try again...')
                 rospy.sleep(0.5)  # short sleep to try and let state settle a bit?
+                attempts += 1
                 continue
             elif result == MoveItErrorCodes.CONTROL_FAILED or \
                  result == MoveItErrorCodes.MOTION_PLAN_INVALIDATED_BY_ENVIRONMENT_CHANGE:
@@ -669,8 +675,10 @@ class ChessArmPlanner:
                     break
                 else:
                     rospy.loginfo('Pick did not grab piece, try again...')
+                    attempts += 1
                     continue
             else:
+                # unhandled error, abort
                 rospy.logerr('Pick failed with error code: %d.' % result)
                 return False
 
@@ -683,7 +691,13 @@ class ChessArmPlanner:
         pt = self._listener.transformPose(FIXED_FRAME, p)
 
         places = self.make_places(pt)
+        attempts = 0
         while True:
+            # limit retries before we abort
+            if attempts > 10:
+                # TODO: try to replace piece and replan?
+                return False
+            # attempt place
             result = self._grasp.place('piece', places, goal_is_eef = True)
             if result == MoveItErrorCodes.SUCCESS:
                 rospy.loginfo('Place succeeded')
@@ -691,18 +705,22 @@ class ChessArmPlanner:
             elif result == MoveItErrorCodes.PLANNING_FAILED:
                 rospy.logerr('Place failed in the planning stage, try again...')
                 rospy.sleep(0.5)  # short sleep to try and let state settle a bit?
+                attempts += 1
                 continue
             elif result == MoveItErrorCodes.CONTROL_FAILED or \
                  result == MoveItErrorCodes.MOTION_PLAN_INVALIDATED_BY_ENVIRONMENT_CHANGE:
                 rospy.logerr('Place failed during execution, attempting to cleanup.')
                 if 'piece' in self._obj.getKnownAttachedObjects():
                     rospy.loginfo('Place did not place object, approach must have failed, will retry...')
+                attempts += 1
                     continue
                 else:
                     rospy.loginfo('Object no longer in gripper, must be placed, continuing...')
                     break
             else:
+                # unhandled error
                 rospy.logerr('Place failed with error code: %d.' % result)
+                # TODO: try to replace piece and replan?
                 return False
 
         return True
