@@ -18,9 +18,6 @@ from moveit_utils.arm_interface import ArmInterface
 from moveit_utils.grasping_interface import GraspingInterface
 from moveit_utils.object_interface import ObjectInterface
 
-
-
-
 if __name__=='__main__':
     rospy.init_node('test_chess_grasping')
     grasp = GraspingInterface(GROUP_NAME_ARM, GROUP_NAME_GRIPPER)
