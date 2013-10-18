@@ -300,9 +300,10 @@ bool BoardFinder::findBoard(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
                     {
                         if ( point_distance(p3d, points[points.size()-2]) > (square_size_ * 1.3) )
                             j_offset += (int) (point_distance(p3d, points[points.size()-2])/ square_size_) - 0.5;
-                        corner_indices[i][j+j_offset] = points.size() - 1;
+                        if (j + j_offset < 7)
+                            corner_indices[i][j+j_offset] = points.size() - 1;
                     }
-                    else
+                    else if (j + j_offset < 7)
                         corner_indices[i][j+j_offset] = points.size() - 1;
                 }
                 else
