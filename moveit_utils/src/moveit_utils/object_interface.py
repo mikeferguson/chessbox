@@ -38,6 +38,7 @@ class ObjectInterface:
         # publisher to send objects to MoveIt
         self._pub = rospy.Publisher('collision_object', CollisionObject)
         self._attached_pub = rospy.Publisher('attached_collision_object', AttachedCollisionObject)
+        self._scene_pub = rospy.Publisher('planning_scene', PlanningScene)
 
         # track the attached and collision objects
         self._mutex = thread.allocate_lock()
@@ -201,4 +202,20 @@ class ObjectInterface:
                 rospy.logerr('ObjectManager: sync timed out.')
                 break
             rospy.sleep(0.1)
+
+    ## @brief Set the color of an object
+    def setColor(self, name, r, g, b, a = 0.9):
+        # Create our color
+        color = ObjectColor()
+        color.id = name
+        color.color.r = r
+        color.color.g = g
+        color.color.b = b
+        color.color.a = a
+
+        # Need to send a planning scene diff
+        p = PlanningScene()
+        p.is_diff = True
+        p.object_colors.append(color)
+        self._scene_pub.publish(p)
 
