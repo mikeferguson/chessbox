@@ -354,9 +354,9 @@ class BoardState:
             return None
 
 class BoardUpdater:
-    def __init__(self, board, listener):
+    def __init__(self, board):
         self.board = board
-        self.listener = listener
+        self.transform = None
         self.up_to_date = False # meaning has changed, now tells whether message has been recieved
 
     def callback(self, message):
@@ -366,6 +366,9 @@ class BoardUpdater:
         # no need to update if already up to date
         if self.up_to_date == True:
             return
+
+        # update transform
+        self.transform = message.board_to_fixed
 
         piece_gone  = list()    # locations moved from
         piece_new   = list()    # locations moved to
@@ -564,8 +567,6 @@ class GnuChessEngine:
 
 class ChessArmPlanner:
 
-    # This is a bit hacky, basically I'm making the "table" thick, and not adding individual chess pieces
-    BOARD_THICKNESS = 0.1
     CHESS_BOARD_FRAME = 'chess_board'
 
     """ Chess-specific stuff """
@@ -577,6 +578,7 @@ class ChessArmPlanner:
             self._listener = TransformListener()
         self._move = ArmInterface(GROUP_NAME_ARM, FIXED_FRAME, self._listener)
         self.success = True
+        self.transform = None
 
     # Get the gripper posture as a JointTrajectory
     def make_gripper_posture(self, pose):

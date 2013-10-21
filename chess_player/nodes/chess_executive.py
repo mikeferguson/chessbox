@@ -59,7 +59,7 @@ class ChessExecutive:
             self.perception_times = list()
 
             # subscribe to input
-            self.updater = BoardUpdater(self.board, self.listener)
+            self.updater = BoardUpdater(self.board)
             rospy.Subscriber('chess_board_state', ChessBoard, self.updater.callback)
 
             # maybe set side?
@@ -178,6 +178,8 @@ class ChessExecutive:
                 updated_t = rospy.Time.now()
             rospy.sleep(0.1)
         self.board.printBoard()
+        # pass transform
+        self.planner.transform = self.updater.transform
 
     def getMove(self):
         return self.engine.nextMove(self.board.last_move, self.board)

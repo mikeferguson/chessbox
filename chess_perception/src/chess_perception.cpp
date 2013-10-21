@@ -73,6 +73,7 @@ class ChessPerception
     {
         if (frames_++ % skip_ != 0) return;
 
+        /* Get transform from camera->fixed */
         tf::StampedTransform tr2;
         try
         {
@@ -84,7 +85,8 @@ class ChessPerception
           return;
         }
 
-        /* Find potential corner points of board.
+        /*
+         * Find potential corner points of board.
          * This is a mostly 2d-operation that is quite fast, but somewhat unreliable.
          * We do this first, so if it fails we can abort the slower table/piece finding.
          */
@@ -109,7 +111,7 @@ class ChessPerception
         }
         ROS_DEBUG_STREAM("Found " << piece_count << " pieces.");
 
-        /* Publish piece estimate */
+        /* Publish piece and transform estimate */
         chess_msgs::ChessBoard cb;
         for (size_t i = 0; i < piece_count; i++)
         {
@@ -125,6 +127,16 @@ class ChessPerception
                 p.type = chess_msgs::ChessPiece::BLACK_UNKNOWN;
             cb.pieces.push_back(p);
         }
+        cb.board_to_fixed.header.frame_id = fixed_frame_;
+        cb.board_to_fixed.header.stamp = ros::Time::now();
+        cb.board_to_fixed.child_frame_id = "chess_board";
+        cb.board_to_fixed.transform.translation.x = board_to_fixed_.getOrigin().getX();  // TODO: is this actually board_to_fixed, or fixed_to_board?
+        cb.board_to_fixed.transform.translation.y = board_to_fixed_.getOrigin().getY();
+        cb.board_to_fixed.transform.translation.z = board_to_fixed_.getOrigin().getZ();
+        cb.board_to_fixed.transform.rotation.x = board_to_fixed_.getRotation().getX();
+        cb.board_to_fixed.transform.rotation.y = board_to_fixed_.getRotation().getY();
+        cb.board_to_fixed.transform.rotation.z = board_to_fixed_.getRotation().getZ();
+        cb.board_to_fixed.transform.rotation.w = board_to_fixed_.getRotation().getW();
         output_.publish(cb);
     }
 

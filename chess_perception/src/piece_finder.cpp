@@ -94,7 +94,6 @@ void PieceFinder::setupUntransformedHull()
     hull_untransformed_.push_back(p);
     p.x = 0;
     hull_untransformed_.push_back(p);
-
 }
 
 void PieceFinder::setSquareSize(double size)
@@ -139,31 +138,49 @@ int PieceFinder::findPieces(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
     cluster_.setInputCloud(cloud_transformed);
     cluster_.extract(clusters);
 
+    ROS_DEBUG_STREAM("Piece Finder: Extracted " << clusters.size() << " clusters.");
+
     /* Merge clusters vertically, determine centroids and weights */
+    std::vector<double> cluster_min_x;
+    std::vector<double> cluster_max_x;
+    std::vector<double> cluster_min_y;
+    std::vector<double> cluster_max_y;
     std::vector< std::vector<int> > cluster_index;
     for (size_t i = 0; i < 64; i++)
         cluster_index.push_back(std::vector<int>());
 
     for (size_t c = 0; c < clusters.size(); c++)
     {
-        /* find color/centroid of this cluster */
-        double x = 0; double y = 0; double z = 0; int color = 0;
+        /* find the limits, and color of this cluster */
+        double min_x = 1000.0;
+        double max_x = -1000.0;
+        double min_y = 1000.0;
+        double max_y = -1000.0;
+        int color = 0;
         for (size_t i = 0; i < clusters[c].indices.size(); i++)
         {
             int j = clusters[c].indices[i];
-            x += cloud_transformed->points[j].x;
-            y += cloud_transformed->points[j].y;
-            z += cloud_transformed->points[j].z;
+            if (cloud_transformed->points[j].x < min_x)
+              min_x = cloud_transformed->points[j].x;
+            if (cloud_transformed->points[j].x > max_x)
+              max_x = cloud_transformed->points[j].x;
+            if (cloud_transformed->points[j].y < min_y)
+              min_y = cloud_transformed->points[j].y;
+            if (cloud_transformed->points[j].y > max_y)
+              max_y = cloud_transformed->points[j].y;
             unsigned char * rgb = (unsigned char *) &(cloud_transformed->points[j].rgb);
             color += (rgb[0] + rgb[1] + rgb[2])/3;
         }
-        x = x/clusters[c].indices.size();
-        y = y/clusters[c].indices.size();
-        z = z/clusters[c].indices.size();
+        cluster_min_x.push_back(min_x);
+        cluster_max_x.push_back(max_x);
+        cluster_min_y.push_back(min_y);
+        cluster_max_y.push_back(max_y);
         color = color/clusters[c].indices.size();
 
         /* outputs */
-        pcl::PointXYZ p(x,y,z);
+        double x = (max_x + min_x) / 2.0;
+        double y = (max_y + min_y) / 2.0;
+        pcl::PointXYZ p(x, y, 0.0);
         double weight = clusters[c].indices.size();
         if(color < threshold_)
             weight = -weight; // use negative numbers for black
@@ -177,17 +194,29 @@ int PieceFinder::findPieces(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
             /* is new */
             pieces.push_back(p);
             weights.push_back(weight);
-            cluster_index[index].push_back(pieces.size()-1); // first index is piece, remaining are clusters
+            cluster_index[index].push_back(pieces.size()-1);  // first index is piece, remaining are clusters
             cluster_index[index].push_back(c);
         }
         else
         {
-            int i_= cluster_index[index][0];
-            double w1 = fabs(weights[i_]);
-            double w2 = fabs(weight);
-            pieces[i_].x = (pieces[i_].x*w1 + p.x*w2)/(w1+w2);
-            pieces[i_].y = (pieces[i_].y*w1 + p.y*w2)/(w1+w2);
-            pieces[i_].z = (pieces[i_].z*w1 + p.z*w2)/(w1+w2);
+            int p_= cluster_index[index][0];  // first index is piece
+            int i_= cluster_index[index][1];  // second index is first cluster, which we update
+
+            /* update limits */
+            if (min_x < cluster_min_x[i_])
+              cluster_min_x[i_] = min_x;
+            if (max_x > cluster_max_x[i_])
+              cluster_max_x[i_] = max_x;
+            if (min_y < cluster_min_y[i_])
+              cluster_min_y[i_] = min_y;
+            if (max_y > cluster_max_y[i_])
+              cluster_max_y[i_] = max_y;
+
+            weights[p_] = weights[p_] + weight;
+
+            pieces[p_].x = (cluster_max_x[i_] + cluster_min_x[i_]) / 2.0;
+            pieces[p_].y = (cluster_max_y[i_] + cluster_min_y[i_]) / 2.0;
+            pieces[p_].z = 0.0;
             cluster_index[index].push_back(c);
         }
     }
