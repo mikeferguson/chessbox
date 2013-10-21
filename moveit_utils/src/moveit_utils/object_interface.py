@@ -45,6 +45,7 @@ class ObjectInterface:
         self._attached = list()
         self._collision = list()
         self._objects = dict()
+        self._colors = dict()
 
         # get the initial planning scene
         if init_from_service:
@@ -212,10 +213,14 @@ class ObjectInterface:
         color.color.g = g
         color.color.b = b
         color.color.a = a
+        self._colors[name] = color
 
+    ## @brief Actually send the colors to MoveIt!
+    def sendColors(self):
         # Need to send a planning scene diff
         p = PlanningScene()
         p.is_diff = True
-        p.object_colors.append(color)
+        for color in self._colors.values():
+            p.object_colors.append(color)
         self._scene_pub.publish(p)
 

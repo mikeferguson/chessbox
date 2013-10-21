@@ -274,6 +274,22 @@ class BoardState:
         else:
             return "x"
 
+    def getPieceHeight(self, piece_type):
+        name = self.getPieceName(piece_type)
+        if name == "p" or name == "P":
+            return 0.045  # pawn
+        elif name == "r" or name == "R":
+            return 0.045  # rook
+        elif name == "n" or name == "N":
+            return 0.057  # knight
+        elif name == "b" or name == "B":
+            return 0.064  # bishop
+        elif name == "q" or name == "Q":
+            return 0.075  # queen
+        elif name == "k" or name == "K":
+            return 0.095  # king
+        return 0.045  # default
+
     def getMoveText(self, move):
         print move
         (col_f, rank_f) = self.toPosition(move[0:2])
@@ -624,21 +640,54 @@ class ChessArmPlanner:
                 places.append(copy.deepcopy(l))
         return places
 
-    def get_piece_height(self, piece_type):
-        name = self.getPieceName(piece_type)
-        if name == "p" or name == "P":
-            return 0.03  # pawn
-        elif name == "r" or name == "R":
-            return 0.04  # rook
-        elif name == "n" or name == "N":
-            return 0.04  # knight
-        elif name == "b" or name == "B":
-            return 0.04  # bishop
-        elif name == "q" or name == "Q":
-            return 0.05  # queen
-        elif name == "k" or name == "K":
-            return 0.05  # king
-        return 0.03  # default
+    def update_objects(self, board):
+        # update table position
+        self._obj.remove('table')
+        p = PoseStamped()
+        p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
+        p.header.frame_id = self.CHESS_BOARD_FRAME
+        p.pose.position.x = SQUARE_SIZE * 4
+        p.pose.position.y = SQUARE_SIZE * 4
+        p.pose.position.z = 0
+        p.pose.orientation.x = p.pose.orientation.y = p.pose.orientation.z = 0.0
+        p.pose.orientation.w = 1.0
+        pt = self._listener.transformPose(FIXED_FRAME, p)
+
+        thickness = pt.pose.position.z
+        pt.pose.position.x = 0.255 + .375
+        pt.pose.position.z = pt.pose.position.z/2.0
+        self._obj.addBox('table', 0.75, 1.5, thickness,
+                         pt.pose.position.x, pt.pose.position.y, pt.pose.position.z, wait=False)
+        self._obj.setColor('table', 223.0/256.0, 90.0/256.0, 12.0/256.0)
+
+        # update piece positions
+        for r in [1,2,3,4,5,6,7,8]:
+            for c in 'abcdefgh':
+                p = board.getPiece(c,r)
+                if p != None:
+                    # insert this piece
+                    height = board.getPieceHeight(p.type)
+                    radius = 0.015
+                    ps = PoseStamped()
+                    ps.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
+                    ps.header.frame_id = self.CHESS_BOARD_FRAME
+                    ps.pose.position.x = p.pose.position.x
+                    ps.pose.position.y = p.pose.position.y
+                    ps.pose.position.z = height/2.0
+                    ps.pose.orientation.x = p.pose.orientation.y = p.pose.orientation.z = 0.0
+                    ps.pose.orientation.w = 1.0
+                    pt = self._listener.transformPose(FIXED_FRAME, ps)
+
+                    self._obj.addCylinder(c + str(r), height, radius, \
+                                          pt.pose.position.x, pt.pose.position.y, pt.pose.position.z, \
+                                          wait=False)
+                    if p.type < 0:
+                        self._obj.setColor(c + str(r), 0, 0, 0)
+                    else:
+                        self._obj.setColor(c + str(r), 0.8, 0.8, 0.8)
+
+        self._obj.waitForSync()
+        self._obj.sendColors()
 
     def move_piece(self, name, start_pose, end_pose):
         # pick it up
@@ -703,7 +752,7 @@ class ChessArmPlanner:
                 rospy.logerr('Place failed during execution, attempting to cleanup.')
                 if name in self._obj.getKnownAttachedObjects():
                     rospy.loginfo('Place did not place object, approach must have failed, will retry...')
-                attempts += 1
+                    attempts += 1
                     continue
                 else:
                     rospy.loginfo('Object no longer in gripper, must be placed, continuing...')
@@ -718,42 +767,14 @@ class ChessArmPlanner:
     def execute(self, move, board):
         """ Execute a move. """
 
+        self.update_objects(board)
+
         # get info about move
         (col_f, rank_f) = board.toPosition(move[0:2])
         (col_t, rank_t) = board.toPosition(move[2:])
         fr = board.getPiece(col_f, rank_f)
         to = board.getPiece(col_t, rank_t)
 
-        # update table position
-        self._obj.remove('table')
-        p = PoseStamped()
-        p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
-        p.header.frame_id = self.CHESS_BOARD_FRAME
-        p.pose.position.x = SQUARE_SIZE * 4
-        p.pose.position.y = SQUARE_SIZE * 4
-        p.pose.position.z = -self.BOARD_THICKNESS/2.0
-        p.pose.orientation.x = p.pose.orientation.y = p.pose.orientation.z = 0.0
-        p.pose.orientation.w = 1.0
-        pt = self._listener.transformPose(FIXED_FRAME, p)
-        self._obj.addBox('table', SQUARE_SIZE * 8, SQUARE_SIZE * 8, self.BOARD_THICKNESS,
-                         pt.pose.position.x, pt.pose.position.y, pt.pose.position.z, wait=False)
-
-        # update piece positions
-        for r in [1,2,3,4,5,6,7,8]:
-            for c in 'abcdefgh':
-                p = self.getPiece(c,r)
-                if c == col_f and r == rank_f:
-                    # part we are moving, use start pose
-                    height = self.get_piece_height(p.type)
-                    radius = 0.0075
-                    self._obj.addCylinder(c + str(r), height, radius, start_pose.position.x, start_pose.position.y, height/2.0, wait=False)
-                elif p != None:
-                    # insert this piece
-                    height = self.get_piece_height(p.type)
-                    radius = 0.0075
-                    self._obj.addCylinder(c + str(r), height, radius, p.x, p.y, height/2.0, wait=False)
-        self._obj.waitForSync()
-                    
         # is this a capture?
         if to != None:
             off_board = ChessPiece()
@@ -761,7 +782,7 @@ class ChessArmPlanner:
             off_board.pose.position.x = OFF_BOARD_X
             off_board.pose.position.y = OFF_BOARD_Y
             off_board.pose.position.z = OFF_BOARD_Z
-            if not self.move_piece(move[2:], get to.pose, off_board.pose):
+            if not self.move_piece(move[2:], to.pose, off_board.pose):
                 rospy.logerr('Failed to move captured piece')
                 self.success = False
                 self.tuck()
@@ -770,8 +791,8 @@ class ChessArmPlanner:
         to = ChessPiece()
         to.header.frame_id = fr.header.frame_id
         to.pose = self.getPose(col_t, rank_t, board, fr.pose.position.z)
-        if not self.move_piece(move[0:2], fr.pose, to.pose):
-            rospy.logerr('Failed to move my piece')
+        if not self.move_piece(move[0:2], fr.pose, to.pose): # TODO pass board as well?
+            rospy.logerr('Failed to move %s' % move[0:2])
             self.success = False
             self.tuck()
             return None

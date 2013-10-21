@@ -22,6 +22,8 @@
 #ROBOT_NAME = "maxwell"
 ROBOT_NAME = "that_other_bot"
 
+SQUARE_SIZE = 0.05715
+
 # TODO: load this from URDF?
 if ROBOT_NAME == "maxwell":
     GROUP_NAME_ARM = 'arm'
