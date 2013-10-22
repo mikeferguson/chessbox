@@ -80,10 +80,8 @@ class ObjectInterface:
         self._objects[name] = o
 
         self._pub.publish(o)
-        while wait and not name in self.getKnownCollisionObjects():
-            rospy.logdebug('Waiting for object to add')
-            self._pub.publish(o)
-            rospy.sleep(0.1)
+        if wait:
+            self.waitForSync()
 
     ## @brief Insert new cylinder into planning scene
     ## @param wait When true, we wait for planning scene to actually update,
@@ -142,10 +140,8 @@ class ObjectInterface:
             pass
 
         self._pub.publish(o)
-        while wait and name in self.getKnownCollisionObjects():
-            rospy.logdebug('Waiting for object to remove')
-            self._pub.publish(o)
-            rospy.sleep(0.1)
+        if wait:
+            self.waitForSync()
 
     ## @brief Update the object lists from a PlanningScene message
     def sceneCb(self, msg):
@@ -182,7 +178,7 @@ class ObjectInterface:
         return l
 
     ## @brief Wait for sync
-    def waitForSync(self, max_time = 10.0):
+    def waitForSync(self, max_time = 2.0):
         sync = False
         t = rospy.Time.now()
         while not sync:
@@ -202,6 +198,7 @@ class ObjectInterface:
             if rospy.Time.now() - t > rospy.Duration(max_time):
                 rospy.logerr('ObjectManager: sync timed out.')
                 break
+            rospy.loginfo('ObjectManager: waiting for sync.')
             rospy.sleep(0.1)
 
     ## @brief Set the color of an object
