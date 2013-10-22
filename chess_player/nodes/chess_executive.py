@@ -47,6 +47,7 @@ class ChessExecutive:
         # get arm planner
         rospy.loginfo('exec: Waiting for actions to connect.')
         self.planner = ChessArmPlanner(listener = self.listener)
+        self.planner.start()
 
         self.board = BoardState()
 
@@ -59,7 +60,7 @@ class ChessExecutive:
             self.perception_times = list()
 
             # subscribe to input
-            self.updater = BoardUpdater(self.board, self.listener)
+            self.updater = BoardUpdater(self.board)
             rospy.Subscriber('chess_board_state', ChessBoard, self.updater.callback)
 
             # maybe set side?
@@ -140,6 +141,9 @@ class ChessExecutive:
                 rospy.loginfo("exec: Bad move...")
                 self.yourMove(True)
                 move = self.getMove()
+            # remove a captured piece from the board
+            if self.updater.last_capture != None:
+                self.planner._obj.remove(self.updater.last_capture)
             # do move
             if self.board.last_move != "go":
                 self.speech.say("I see you have moved your " + self.board.getMoveText(self.board.last_move))
@@ -178,6 +182,8 @@ class ChessExecutive:
                 updated_t = rospy.Time.now()
             rospy.sleep(0.1)
         self.board.printBoard()
+        # pass transform
+        self.planner.transform = self.updater.transform
 
     def getMove(self):
         return self.engine.nextMove(self.board.last_move, self.board)
