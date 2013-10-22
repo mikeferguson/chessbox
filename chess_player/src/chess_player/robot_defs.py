@@ -73,7 +73,7 @@ elif ROBOT_NAME == "that_other_bot":
 
     # This was previously 0.0075
     GRIPPER_CLOSED = 0.0
-    GRIPPER_OPEN = 0.0275
+    GRIPPER_OPEN = 0.04
 
     # Tucking the arm requires a set of joint constraints
     joint_names = ['shoulder_pan_joint', 'shoulder_lift_joint', 'upperarm_roll_joint', 'elbow_flex_joint', 'forearm_roll_joint', 'wrist_flex_joint', 'wrist_roll_joint']
@@ -83,7 +83,7 @@ elif ROBOT_NAME == "that_other_bot":
     # Torso lift ready position would be 0.3156985342502594
 
     head_joint_names = ['head_pan_joint', 'head_tilt_joint']
-    head_pose_look_at_board = [0.0, 1.0]
+    head_pose_look_at_board = [0.0, 0.925]
     head_pose_look_at_player = [0.0, 0.0]
 
     gripper_joint_names = ['left_gripper_joint', 'right_gripper_joint']

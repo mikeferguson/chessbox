@@ -141,6 +141,9 @@ class ChessExecutive:
                 rospy.loginfo("exec: Bad move...")
                 self.yourMove(True)
                 move = self.getMove()
+            # remove a captured piece from the board
+            if self.updater.last_capture != None:
+                self.planner._obj.remove(self.updater.last_capture)
             # do move
             if self.board.last_move != "go":
                 self.speech.say("I see you have moved your " + self.board.getMoveText(self.board.last_move))

@@ -66,7 +66,6 @@ class BoardState:
         self.max_changes = 2
         self.output = False
         self.castling_move = None
-        self.last_captured = None
 
     def newGame(self):
         """
@@ -88,7 +87,7 @@ class BoardState:
         self.setPiece('h', 1, self.makePiece(ChessPiece.WHITE_ROOK, 'h', 1, "wrook1"))
 
         self.setPiece('a', 8, self.makePiece(ChessPiece.BLACK_ROOK, 'a', 8, "brook0"))
-        self.setPiece('b', 8, self.makePiece(ChessPiece.BLACK_KNIGHT, 'b', 8, "bknight1"))
+        self.setPiece('b', 8, self.makePiece(ChessPiece.BLACK_KNIGHT, 'b', 8, "bknight0"))
         self.setPiece('c', 8, self.makePiece(ChessPiece.BLACK_BISHOP, 'c', 8, "bbishop0"))
         self.setPiece('d', 8, self.makePiece(ChessPiece.BLACK_QUEEN, 'd', 8, "bqueen"))
         self.setPiece('e', 8, self.makePiece(ChessPiece.BLACK_KING, 'e', 8, "bking"))
@@ -164,8 +163,8 @@ class BoardState:
         for r in [8,7,6,5,4,3,2,1]:
             for c in 'abcdefgh':
                 p = self.getPiece(c,r)
-                if p != None and p.header.frame_id == "chess_board":
-                    print "Warning, frame is chess_board:", c+str(r)
+                #if p != None and p.header.frame_id == "chess_board":
+                #    print "Warning, frame is chess_board:", c+str(r)
 
     def revert(self):
         self.values = self.previous[0]
@@ -372,6 +371,7 @@ class BoardUpdater:
     def __init__(self, board):
         self.board = board
         self.transform = None
+        self.last_capture = None
         self.up_to_date = False # meaning has changed, now tells whether message has been recieved
 
     def callback(self, message):
@@ -513,7 +513,7 @@ class BoardUpdater:
             piece_to = piece_new[0]
         else:
             # remove the old piece from the planning scene
-            self.last_captured = self.board.getPieceId(self.board.getPiece(piece_color[0],piece_color[1]))
+            self.last_capture = self.board.getPieceId(self.board.getPiece(piece_color[0][0],piece_color[0][1]))
             piece_to = piece_color[0]
         piece_fr = candidates[0]
         # update type
@@ -656,7 +656,7 @@ class ChessArmPlanner(Thread):
         g.desired_distance = desired
         return g
 
-    def make_grasps(self, pose_stamped):
+    def make_grasps(self, pose_stamped, mega_angle=False):
         # setup defaults of grasp
         g = Grasp()
         g.pre_grasp_posture = self.make_gripper_posture(GRIPPER_OPEN)
@@ -665,10 +665,14 @@ class ChessArmPlanner(Thread):
         g.post_grasp_retreat = self.make_gripper_translation(0.1, 0.15, -1.0)
         g.grasp_pose = pose_stamped
 
+        pitch_vals = [0, 0.2, -0.2, 0.4, -0.4]
+        if mega_angle:
+            pitch_vals += [0.3, -0.3, 0.5, -0.5, 0.6, -0.6]
+
         # generate list of grasps
         grasps = []
         for y in [-1.57, -0.78, 0, 0.78, 1.57]:
-            for p in [0, 0.2, -0.2, 0.4, -0.4]:
+            for p in pitch_vals:
                 q = quaternion_from_euler(0, 1.57-p, y)
                 g.grasp_pose.pose.orientation.x = q[0]
                 g.grasp_pose.pose.orientation.y = q[1]
@@ -679,7 +683,7 @@ class ChessArmPlanner(Thread):
                 grasps.append(copy.deepcopy(g))
         return grasps
 
-    def make_places(self, pose_stamped):
+    def make_places(self, pose_stamped, mega_angle=False):
         # setup default of place location
         l = PlaceLocation()
         l.post_place_posture = self.make_gripper_posture(GRIPPER_OPEN)
@@ -687,10 +691,14 @@ class ChessArmPlanner(Thread):
         l.post_place_retreat = self.make_gripper_translation(0.1, 0.15, -1.0)
         l.place_pose = pose_stamped
 
+        pitch_vals = [0, 0.2, -0.2, 0.4, -0.4]
+        if mega_angle:
+            pitch_vals += [0.3, -0.3, 0.5, -0.5, 0.6, -0.6]
+
         # generate list of place locations
         places = []
         for y in [-1.57, -0.78, 0, 0.78, 1.57]:
-            for p in [0, 0.2, -0.2, 0.4, -0.4]:
+            for p in pitch_vals:
                 q = quaternion_from_euler(0, p, y)  # now in object frame
                 l.place_pose.pose.orientation.x = q[0]
                 l.place_pose.pose.orientation.y = q[1]
@@ -758,6 +766,8 @@ class ChessArmPlanner(Thread):
         while True:
             # limit retries before we abort
             if attempts > 10:
+                grasps = self.make_grasps(start_pose, True)  # regen grasps with wider angles
+            if attempts > 50:
                 return False
             # attempt grasp
             result = self._grasp.pickup(name, grasps)
@@ -770,7 +780,8 @@ class ChessArmPlanner(Thread):
                 attempts += 1
                 continue
             elif result == MoveItErrorCodes.CONTROL_FAILED or \
-                 result == MoveItErrorCodes.MOTION_PLAN_INVALIDATED_BY_ENVIRONMENT_CHANGE:
+                 result == MoveItErrorCodes.MOTION_PLAN_INVALIDATED_BY_ENVIRONMENT_CHANGE or \
+                 result == MoveItErrorCodes.TIMED_OUT:
                 rospy.logerr('Pick failed during execution, attempting to cleanup.')
                 if name in self._obj.getKnownAttachedObjects():
                     rospy.loginfo('Pick managed to grab piece, retreat must have failed, continuing anyways')
@@ -791,6 +802,8 @@ class ChessArmPlanner(Thread):
         while True:
             # limit retries before we abort
             if attempts > 10:
+                places = self.make_places(end_pose, True)  # regen places with wider angles
+            if attempts > 50:
                 # TODO: try to replace piece and replan?
                 return False
             # attempt place
@@ -804,7 +817,8 @@ class ChessArmPlanner(Thread):
                 attempts += 1
                 continue
             elif result == MoveItErrorCodes.CONTROL_FAILED or \
-                 result == MoveItErrorCodes.MOTION_PLAN_INVALIDATED_BY_ENVIRONMENT_CHANGE:
+                 result == MoveItErrorCodes.MOTION_PLAN_INVALIDATED_BY_ENVIRONMENT_CHANGE or \
+                 result == MoveItErrorCodes.TIMED_OUT:
                 rospy.logerr('Place failed during execution, attempting to cleanup.')
                 if name in self._obj.getKnownAttachedObjects():
                     rospy.loginfo('Place did not place object, approach must have failed, will retry...')
@@ -839,16 +853,20 @@ class ChessArmPlanner(Thread):
         fr.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
         fr.header.frame_id = "chess_board"
         fr.pose = fr_piece.pose
-        fr.pose.position.z = board.getPieceHeight(fr)
+        fr.pose.position.z = board.getPieceHeight(fr_piece.type)
         fr = self.transform_pose(fr)
 
         # is this a capture?
         if to_piece != None:
-            print 'Capturing', to_piece.header.frame_id
+            # get name of piece
+            to_id = board.getPieceId(to_piece)
+            print 'Capturing', to_id
+
             to = PoseStamped()
             to.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
             to.header.frame_id = "chess_board"
             to.pose = to_piece.pose
+            to.pose.position.z = board.getPieceHeight(to_piece.type)
             to = self.transform_pose(to)
 
             # get name of piece
@@ -868,10 +886,14 @@ class ChessArmPlanner(Thread):
                 self.tuck()
                 return None
 
+            # remove from planning scene
+            self._obj.remove(to_id)
+
         to = PoseStamped()
         to.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
         to.header.frame_id = "chess_board"
-        to.pose = self.getPose(col_t, rank_t, board, board.getPieceHeight(fr))
+        height = board.getPieceHeight(fr_piece.type)/2.0 + 0.0075  # object-centric use half height plus small margin
+        to.pose = self.getPose(col_t, rank_t, board, height)
         to = self.transform_pose(to)
 
         if not self.move_piece(fr_id, fr, to):
