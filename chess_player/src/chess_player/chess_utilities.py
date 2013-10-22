@@ -37,8 +37,11 @@ from geometry_msgs.msg import PoseStamped
 from moveit_msgs.msg import Grasp, GripperTranslation, PlaceLocation
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
+from tf.broadcaster import *
 from tf.listener import *
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
+
+from threading import Thread
 
 SQUARE_SIZE = 0.05715
 
@@ -63,6 +66,7 @@ class BoardState:
         self.max_changes = 2
         self.output = False
         self.castling_move = None
+        self.last_captured = None
 
     def newGame(self):
         """
@@ -71,33 +75,33 @@ class BoardState:
         self.last_move = "go"
         self.values = [None for i in range(64)]
         for i in range(8):
-            self.setPiece(i, 2, self.makePiece(ChessPiece.WHITE_PAWN, i, 2))
-            self.setPiece(i, 7, self.makePiece(ChessPiece.BLACK_PAWN, i, 7))
+            self.setPiece(i, 2, self.makePiece(ChessPiece.WHITE_PAWN, i, 2, "wpawn"+str(i)))
+            self.setPiece(i, 7, self.makePiece(ChessPiece.BLACK_PAWN, i, 7, "bpawn"+str(i)))
 
-        self.setPiece('a', 1, self.makePiece(ChessPiece.WHITE_ROOK, 'a', 1))
-        self.setPiece('b', 1, self.makePiece(ChessPiece.WHITE_KNIGHT, 'b', 1))
-        self.setPiece('c', 1, self.makePiece(ChessPiece.WHITE_BISHOP, 'c', 1))
-        self.setPiece('d', 1, self.makePiece(ChessPiece.WHITE_QUEEN, 'd', 1))
-        self.setPiece('e', 1, self.makePiece(ChessPiece.WHITE_KING, 'e', 1))
-        self.setPiece('f', 1, self.makePiece(ChessPiece.WHITE_BISHOP, 'f', 1))
-        self.setPiece('g', 1, self.makePiece(ChessPiece.WHITE_KNIGHT, 'g', 1))
-        self.setPiece('h', 1, self.makePiece(ChessPiece.WHITE_ROOK, 'h', 1))
+        self.setPiece('a', 1, self.makePiece(ChessPiece.WHITE_ROOK, 'a', 1, "wrook0"))
+        self.setPiece('b', 1, self.makePiece(ChessPiece.WHITE_KNIGHT, 'b', 1, "wknight0"))
+        self.setPiece('c', 1, self.makePiece(ChessPiece.WHITE_BISHOP, 'c', 1, "wbishop0"))
+        self.setPiece('d', 1, self.makePiece(ChessPiece.WHITE_QUEEN, 'd', 1, "wqueen"))
+        self.setPiece('e', 1, self.makePiece(ChessPiece.WHITE_KING, 'e', 1, "wking"))
+        self.setPiece('f', 1, self.makePiece(ChessPiece.WHITE_BISHOP, 'f', 1, "wbishop1"))
+        self.setPiece('g', 1, self.makePiece(ChessPiece.WHITE_KNIGHT, 'g', 1, "wknight1"))
+        self.setPiece('h', 1, self.makePiece(ChessPiece.WHITE_ROOK, 'h', 1, "wrook1"))
 
-        self.setPiece('a', 8, self.makePiece(ChessPiece.BLACK_ROOK, 'a', 8))
-        self.setPiece('b', 8, self.makePiece(ChessPiece.BLACK_KNIGHT, 'b', 8))
-        self.setPiece('c', 8, self.makePiece(ChessPiece.BLACK_BISHOP, 'c', 8))
-        self.setPiece('d', 8, self.makePiece(ChessPiece.BLACK_QUEEN, 'd', 8))
-        self.setPiece('e', 8, self.makePiece(ChessPiece.BLACK_KING, 'e', 8))
-        self.setPiece('f', 8, self.makePiece(ChessPiece.BLACK_BISHOP, 'f', 8))
-        self.setPiece('g', 8, self.makePiece(ChessPiece.BLACK_KNIGHT, 'g', 8))
-        self.setPiece('h', 8, self.makePiece(ChessPiece.BLACK_ROOK, 'h', 8))
+        self.setPiece('a', 8, self.makePiece(ChessPiece.BLACK_ROOK, 'a', 8, "brook0"))
+        self.setPiece('b', 8, self.makePiece(ChessPiece.BLACK_KNIGHT, 'b', 8, "bknight1"))
+        self.setPiece('c', 8, self.makePiece(ChessPiece.BLACK_BISHOP, 'c', 8, "bbishop0"))
+        self.setPiece('d', 8, self.makePiece(ChessPiece.BLACK_QUEEN, 'd', 8, "bqueen"))
+        self.setPiece('e', 8, self.makePiece(ChessPiece.BLACK_KING, 'e', 8, "bking"))
+        self.setPiece('f', 8, self.makePiece(ChessPiece.BLACK_BISHOP, 'f', 8, "bbishop1"))
+        self.setPiece('g', 8, self.makePiece(ChessPiece.BLACK_KNIGHT, 'g', 8, "bknight1"))
+        self.setPiece('h', 8, self.makePiece(ChessPiece.BLACK_ROOK, 'h', 8, "brook1"))
 
-    def makePiece(self, val, column, rank):
+    def makePiece(self, val, column, rank, name):
         """
         Helper function to generate ChessPiece messages.
         """
         p = ChessPiece()
-        p.header.frame_id = "chess_board"
+        p.header.frame_id = name # used to be "chess_board" but we already know that
         p.pose.position.x = SQUARE_SIZE * (0.5 + self.getColIdx(column))
         p.pose.position.y = SQUARE_SIZE * (0.5 + rank - 1)
         p.pose.position.z = 0.03
@@ -106,6 +110,7 @@ class BoardState:
 
     def copyPiece(self, val, copy):
         p = self.makePiece(val, 0, 1)
+        p.header.frame_id = copy.header.frame_id # copy over name
         p.pose = copy.pose
         return p
 
@@ -156,6 +161,12 @@ class BoardState:
                         print self.getPieceName(p.type),
                 print ""
 
+        for r in [8,7,6,5,4,3,2,1]:
+            for c in 'abcdefgh':
+                p = self.getPiece(c,r)
+                if p != None and p.header.frame_id == "chess_board":
+                    print "Warning, frame is chess_board:", c+str(r)
+
     def revert(self):
         self.values = self.previous[0]
         self.last_move = self.previous[1]
@@ -164,6 +175,7 @@ class BoardState:
         fr = self.getPiece(col_f, row_f)
         to = board.getPiece(col_t, row_t)
         to.type = fr.type
+        to.header.frame_id = fr.header.frame_id  # TODO does this belong here?
         board.setPiece(col_t,row_t,to)
 
     def applyMove(self, move, pose=None):
@@ -353,6 +365,9 @@ class BoardState:
         else:
             return None
 
+    def getPieceId(self, piece):
+        return piece.header.frame_id
+
 class BoardUpdater:
     def __init__(self, board):
         self.board = board
@@ -393,7 +408,7 @@ class BoardUpdater:
                 p = self.board.getPiece(col, rank)
                 if p == None and not self.board.side == None:
                     piece_new.append([col, rank, piece])
-                    rospy.logdebug("Piece moved to: %s%s" % (col,str(rank)))
+                    rospy.loginfo("Piece moved to: %s%s" % (col,str(rank)))
                 temp_board.setPiece(col, rank, piece)
 
         # see how board has changed
@@ -408,10 +423,11 @@ class BoardUpdater:
                 elif old != None and new != None and new.type/abs(float(new.type)) != old.type/abs(float(old.type)):
                     # capture!
                     piece_color.append([col, rank, new])
-                    rospy.logdebug("Piece captured: %s%s" % (col,str(rank)))
+                    rospy.loginfo("Piece captured: %s%s" % (col,str(rank)))
                 elif old != None and new != None:
                     # boring, but update types!
                     new.type = old.type
+                    new.header.frame_id = old.header.frame_id
                     temp_board.setPiece(col,rank,new)
 
         # plausibility test: there can only be one change or new piece
@@ -444,6 +460,10 @@ class BoardUpdater:
                 #self.copyType(m[0], m[1], m[2], m[3], temp_board)
                 to = ChessPiece()
                 to.type = self.board.side * ChessPiece.BLACK_KING
+                if to.type > 0:
+                    to.header.frame_id = "wking"
+                else:
+                    to.header.frame_id = "bking"
                 temp_board.setPiece(m[2],int(m[3]),to)
 
                 m = castling_extras[m]
@@ -451,6 +471,16 @@ class BoardUpdater:
                 #self.copyType(m[0], m[1], m[2], m[3], temp_board)
                 to = ChessPiece()
                 to.type = self.board.side * ChessPiece.BLACK_ROOK
+                if to.type > 0:
+                    if m[0] == 0:
+                        to.header.frame_id = "wrook0"
+                    else:
+                        to.header.frame_id = "wrook1"
+                else:
+                    if m[0] == 0:
+                        to.header.frame_id = "brook0"
+                    else:
+                        to.header.frame_id = "brook1"
                 temp_board.setPiece(m[2],int(m[3]),to)
                 self.board.previous = [self.board.values, self.board.last_move]
                 self.board.last_move = self.board.castling_move
@@ -482,6 +512,8 @@ class BoardUpdater:
         if len(piece_new) == 1:
             piece_to = piece_new[0]
         else:
+            # remove the old piece from the planning scene
+            self.last_captured = self.board.getPieceId(self.board.getPiece(piece_color[0],piece_color[1]))
             piece_to = piece_color[0]
         piece_fr = candidates[0]
         # update type
@@ -565,20 +597,46 @@ class GnuChessEngine:
             print h
         self.engine.sendline('exit')
 
-class ChessArmPlanner:
+class ChessArmPlanner(Thread):
 
     CHESS_BOARD_FRAME = 'chess_board'
 
     """ Chess-specific stuff """
     def __init__(self, listener = None):
+        Thread.__init__(self)
         self._grasp = GraspingInterface(GROUP_NAME_ARM, GROUP_NAME_GRIPPER)
         self._obj = ObjectInterface(FIXED_FRAME)
         self._listener = listener
         if self._listener == None:
             self._listener = TransformListener()
+        self._broadcaster = TransformBroadcaster()
         self._move = ArmInterface(GROUP_NAME_ARM, FIXED_FRAME, self._listener)
         self.success = True
         self.transform = None
+
+    def run(self):
+        while not rospy.is_shutdown():
+            if self.transform != None:
+                translation = [self.transform.transform.translation.x, \
+                               self.transform.transform.translation.y, \
+                               self.transform.transform.translation.z]
+                rotation    = [self.transform.transform.rotation.x, \
+                               self.transform.transform.rotation.y, \
+                               self.transform.transform.rotation.z, \
+                               self.transform.transform.rotation.w]
+                self._broadcaster.sendTransform(translation,
+                                                rotation,
+                                                rospy.Time.now(),
+                                                "chess_board",
+                                                "base_link")
+            rospy.sleep(0.1)
+
+    def transform_pose(self, pose):
+        if self.transform:
+            # TODO transform manually
+            return self._listener.transformPose(FIXED_FRAME, pose)
+        else:
+            return self._listener.transformPose(FIXED_FRAME, pose)
 
     # Get the gripper posture as a JointTrajectory
     def make_gripper_posture(self, pose):
@@ -653,7 +711,7 @@ class ChessArmPlanner:
         p.pose.position.z = 0
         p.pose.orientation.x = p.pose.orientation.y = p.pose.orientation.z = 0.0
         p.pose.orientation.w = 1.0
-        pt = self._listener.transformPose(FIXED_FRAME, p)
+        pt = self.transform_pose(p)
 
         thickness = pt.pose.position.z
         pt.pose.position.x = 0.255 + .375
@@ -678,15 +736,15 @@ class ChessArmPlanner:
                     ps.pose.position.z = height/2.0
                     ps.pose.orientation.x = p.pose.orientation.y = p.pose.orientation.z = 0.0
                     ps.pose.orientation.w = 1.0
-                    pt = self._listener.transformPose(FIXED_FRAME, ps)
+                    pt = self.transform_pose(ps)
 
-                    self._obj.addCylinder(c + str(r), height, radius, \
+                    self._obj.addCylinder(board.getPieceId(p), height, radius, \
                                           pt.pose.position.x, pt.pose.position.y, pt.pose.position.z, \
                                           wait=False)
                     if p.type < 0:
-                        self._obj.setColor(c + str(r), 0, 0, 0)
+                        self._obj.setColor(board.getPieceId(p), 0, 0, 0)
                     else:
-                        self._obj.setColor(c + str(r), 0.8, 0.8, 0.8)
+                        self._obj.setColor(board.getPieceId(p), 0.8, 0.8, 0.8)
 
         self._obj.waitForSync()
         self._obj.sendColors()
@@ -773,31 +831,38 @@ class ChessArmPlanner:
         fr_piece = board.getPiece(col_f, rank_f)
         to_piece = board.getPiece(col_t, rank_t)
 
+        # get name of piece
+        fr_id = board.getPieceId(fr_piece)
+
         # transform
         fr = PoseStamped()
         fr.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
         fr.header.frame_id = "chess_board"
         fr.pose = fr_piece.pose
         fr.pose.position.z = board.getPieceHeight(fr)
-        fr = self._listener.transformPose(FIXED_FRAME, fr)
+        fr = self.transform_pose(fr)
 
         # is this a capture?
         if to_piece != None:
+            print 'Capturing', to_piece.header.frame_id
             to = PoseStamped()
             to.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
             to.header.frame_id = "chess_board"
             to.pose = to_piece.pose
-            to = self._listener.transformPose(FIXED_FRAME, to)
+            to = self.transform_pose(to)
 
-            #off_board = ChessPiece()
+            # get name of piece
+            to_id = board.getPieceId(to_piece)
+
             off_board = PoseStamped()
             off_board.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
             off_board.header.frame_id = "chess_board"
             off_board.pose.position.x = OFF_BOARD_X
             off_board.pose.position.y = OFF_BOARD_Y
             off_board.pose.position.z = OFF_BOARD_Z
-            off_board = self._listener.transformPose(FIXED_FRAME, off_board)
-            if not self.move_piece(move[2:], to, off_board):
+            off_board = self.transform_pose(off_board)
+
+            if not self.move_piece(to_id, to, off_board):
                 rospy.logerr('Failed to move captured piece')
                 self.success = False
                 self.tuck()
@@ -807,9 +872,9 @@ class ChessArmPlanner:
         to.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
         to.header.frame_id = "chess_board"
         to.pose = self.getPose(col_t, rank_t, board, board.getPieceHeight(fr))
-        to = self._listener.transformPose(FIXED_FRAME, to)
+        to = self.transform_pose(to)
 
-        if not self.move_piece(move[0:2], fr, to):
+        if not self.move_piece(fr_id, fr, to):
             rospy.logerr('Failed to move %s' % move[0:2])
             self.success = False
             self.tuck()

@@ -47,6 +47,7 @@ class ChessExecutive:
         # get arm planner
         rospy.loginfo('exec: Waiting for actions to connect.')
         self.planner = ChessArmPlanner(listener = self.listener)
+        self.planner.start()
 
         self.board = BoardState()
 

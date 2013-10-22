@@ -143,7 +143,7 @@ class ChessPerception
     /** \brief Periodic callback to publish tf data */
     void publishCallback(const ros::WallTimerEvent& event)
     {
-        br_.sendTransform(tf::StampedTransform(board_to_fixed_, ros::Time::now(), fixed_frame_, "chess_board"));
+        br_.sendTransform(tf::StampedTransform(board_to_fixed_, ros::Time::now(), fixed_frame_, "chess_board_estimate"));
     }
 
   private:
