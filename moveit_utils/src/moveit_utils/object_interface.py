@@ -21,6 +21,8 @@ from __future__ import print_function
 import thread, copy
 import rospy
 
+from pyassimp import pyassimp
+
 from geometry_msgs.msg import *
 from moveit_msgs.msg import *
 from moveit_msgs.srv import *
@@ -64,6 +66,43 @@ class ObjectInterface:
 
         # subscribe to planning scene
         rospy.Subscriber('move_group/monitored_planning_scene', PlanningScene, self.sceneCb)
+
+    ## @brief Insert a mesh into the planning scene
+    ## @param wait When true, we wait for planning scene to actually update,
+    ##             this provides immunity against lost messages.
+    def addMesh(self, name, pose, filename, wait = True):
+        scene = pyassimp.load(filename)
+        if not scene.meshes:
+            rospy.logerr('Unable to load mesh')
+            return
+
+        mesh = Mesh()
+        for face in scene.meshes[0].faces:
+            triangle = MeshTriangle()
+            if len(face.indices) == 3:
+                triangle.vertex_indices = [face.indices[0], face.indices[1], face.indices[2]]
+            mesh.triangles.append(triangle)
+        for vertex in scene.meshes[0].vertices:
+            point = Point()
+            point.x = vertex[0]
+            point.y = vertex[1]
+            point.z = vertex[2]
+            mesh.vertices.append(point)
+        pyassimp.release(scene)
+
+        o = CollisionObject()
+        o.header.stamp = rospy.Time.now()
+        o.header.frame_id = self._fixed_frame
+        o.id = name
+        o.meshes.append(mesh)
+        o.mesh_poses.append(pose)
+        o.operation = o.ADD
+
+        self._objects[name] = o
+
+        self._pub.publish(o)
+        if wait:
+            self.waitForSync()
 
     ## @brief Insert a solid primitive into planning scene
     ## @param wait When true, we wait for planning scene to actually update,
@@ -198,7 +237,7 @@ class ObjectInterface:
             if rospy.Time.now() - t > rospy.Duration(max_time):
                 rospy.logerr('ObjectManager: sync timed out.')
                 break
-            rospy.loginfo('ObjectManager: waiting for sync.')
+            rospy.logdebug('ObjectManager: waiting for sync.')
             rospy.sleep(0.1)
 
     ## @brief Set the color of an object
