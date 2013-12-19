@@ -65,7 +65,7 @@ def pose_msg_from_matrix(transformation):
     msg = Pose()
     msg.position = point_msg_from_matrix(transformation)
     msg.orientation = quaternion_msg_from_matrix(transformation)
-    return p
+    return msg
 
 ## @brief Translate a geometry_msgs/Pose
 ## @param pose The pose to translate
@@ -75,7 +75,7 @@ def pose_msg_from_matrix(transformation):
 def translate_pose_msg(pose, x, y, z):
     initial = matrix_from_pose_msg(pose)
     transform = translation_matrix((x,y,z))
-    return pose_from_matrix(concatenate_matrices(initial, transform))
+    return pose_msg_from_matrix(concatenate_matrices(initial, transform))
 
 ## @brief Rotate a geometry_msgs/Pose
 ## @param pose The pose to rotate
