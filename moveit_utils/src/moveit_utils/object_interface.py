@@ -47,6 +47,7 @@ class ObjectInterface:
         self._attached = list()
         self._collision = list()
         self._objects = dict()
+        self._attached_objects = dict()
         self._colors = dict()
 
         # get the initial planning scene
@@ -67,10 +68,11 @@ class ObjectInterface:
         # subscribe to planning scene
         rospy.Subscriber('move_group/monitored_planning_scene', PlanningScene, self.sceneCb)
 
-    ## @brief Insert a mesh into the planning scene
-    ## @param wait When true, we wait for planning scene to actually update,
-    ##             this provides immunity against lost messages.
-    def addMesh(self, name, pose, filename, wait = True):
+    ## @brief Make a mesh collision object
+    ## @param name Name of the object
+    ## @param pose A geometry_msgs/Pose for the object
+    ## @param filename The mesh file to load
+    def makeMesh(self, name, pose, filename):
         scene = pyassimp.load(filename)
         if not scene.meshes:
             rospy.logerr('Unable to load mesh')
@@ -97,17 +99,15 @@ class ObjectInterface:
         o.meshes.append(mesh)
         o.mesh_poses.append(pose)
         o.operation = o.ADD
+        return o
 
-        self._objects[name] = o
-
-        self._pub.publish(o)
-        if wait:
-            self.waitForSync()
-
-    ## @brief Insert a solid primitive into planning scene
+    ## @brief Make a solid primitive collision object
+    ## @param name Name of the object
+    ## @param solid The solid primitive to add
+    ## @param pose A geometry_msgs/Pose for the object
     ## @param wait When true, we wait for planning scene to actually update,
     ##             this provides immunity against lost messages.
-    def addSolidPrimitive(self, name, solid, pose, wait = True):
+    def makeSolidPrimitive(self, name, solid, pose):
         o = CollisionObject()
         o.header.stamp = rospy.Time.now()
         o.header.frame_id = self._fixed_frame
@@ -115,9 +115,55 @@ class ObjectInterface:
         o.primitives.append(solid)
         o.primitive_poses.append(pose)
         o.operation = o.ADD
+        return o
 
+    ## @brief Make an attachedCollisionObject
+    def makeAttached(self, link_name, obj, touch_links, detach_posture, weight):
+        o = AttachedCollisionObject()
+        o.link_name = link_name
+        o.object = obj
+        if touch_links:
+            o.touch_links = touch_links
+        if detach_posture:
+            o.detach_posture = detach_posture
+        o.weight = weight
+        return o
+
+    ## @brief Insert a mesh into the planning scene
+    ## @param name Name of the object
+    ## @param pose A geometry_msgs/Pose for the object
+    ## @param filename The mesh file to load
+    ## @param wait When true, we wait for planning scene to actually update,
+    ##             this provides immunity against lost messages.
+    def addMesh(self, name, pose, filename, wait = True):
+        o = self.makeMesh(name, pose, filename)
         self._objects[name] = o
+        self._pub.publish(o)
+        if wait:
+            self.waitForSync()
 
+    ## @brief Attach a mesh into the planning scene
+    ## @param name Name of the object
+    ## @param pose A geometry_msgs/Pose for the object
+    ## @param filename The mesh file to load
+    ## @param wait When true, we wait for planning scene to actually update,
+    ##             this provides immunity against lost messages.
+    def attachMesh(self, name, pose, filename,
+                   link_name, touch_links = None, detach_posture = None, weight = 0.0,
+                   wait = True):
+        o = self.makeMesh(name, pose, filename)
+        a = self.makeAttached(link_name, o, touch_links, detach_posture, weight)
+        self._attached_objects[name] = a
+        self._attached_pub.publish(a)
+        if wait:
+            self.waitForSync()
+
+    ## @brief Insert a solid primitive into planning scene
+    ## @param wait When true, we wait for planning scene to actually update,
+    ##             this provides immunity against lost messages.
+    def addSolidPrimitive(self, name, solid, pose, wait = True):
+        o = self.makeSolidPrimitive(name, solid, pose)
+        self._objects[name] = o
         self._pub.publish(o)
         if wait:
             self.waitForSync()
@@ -224,7 +270,7 @@ class ObjectInterface:
             sync = True
             # delete objects that should be gone
             for name in self._collision + self._attached:
-                if name not in self._objects.keys():
+                if name not in self._objects.keys() + self._attached_objects.keys():
                     # should be removed, is not
                     self.remove(name, False)
                     sync = False
@@ -232,6 +278,10 @@ class ObjectInterface:
             for name in self._objects.keys():
                 if name not in self._collision + self._attached:
                     self._pub.publish(self._objects[name])
+                    sync = False
+            for name in self._attached_objects.keys():
+                if name not in self._attached:
+                    self._attached_pub.publish(self._attached_objects[name])
                     sync = False
             # timeout
             if rospy.Time.now() - t > rospy.Duration(max_time):
