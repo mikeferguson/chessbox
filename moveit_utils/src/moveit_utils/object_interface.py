@@ -152,6 +152,7 @@ class ObjectInterface:
                    link_name, touch_links = None, detach_posture = None, weight = 0.0,
                    wait = True):
         o = self.makeMesh(name, pose, filename)
+        o.header.frame_id = link_name
         a = self.makeAttached(link_name, o, touch_links, detach_posture, weight)
         self._attached_objects[name] = a
         self._attached_pub.publish(a)
