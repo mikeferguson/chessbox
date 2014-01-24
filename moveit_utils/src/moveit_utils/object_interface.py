@@ -186,6 +186,13 @@ class ObjectInterface:
         self.addSolidPrimitive(name, s, ps.pose, wait)
 
     ## @brief Insert new box into planning scene
+    ## @param name Name of the object
+    ## @param size_x The x-dimensions size of the box
+    ## @param size_y The y-dimensions size of the box
+    ## @param size_z The z-dimensions size of the box
+    ## @param x The x position in link_name frame
+    ## @param y The y position in link_name frame
+    ## @param z The z position in link_name frame
     ## @param wait When true, we wait for planning scene to actually update,
     ##             this provides immunity against lost messages.
     def addBox(self, name, size_x, size_y, size_z, x, y, z, wait = True):
@@ -201,6 +208,39 @@ class ObjectInterface:
         ps.pose.orientation.w = 1.0
 
         self.addSolidPrimitive(name, s, ps.pose, wait)
+
+    ## @brief Attach a box into the planning scene
+    ## @param name Name of the object
+    ## @param size_x The x-dimensions size of the box
+    ## @param size_y The y-dimensions size of the box
+    ## @param size_z The z-dimensions size of the box
+    ## @param x The x position in link_name frame
+    ## @param y The y position in link_name frame
+    ## @param z The z position in link_name frame
+    ## @param link_name Name of link to attach this object to
+    ## @param touch_links Names of robot links that can touch this object
+    ## @param wait When true, we wait for planning scene to actually update,
+    ##             this provides immunity against lost messages.
+    def attachBox(self, name, size_x, size_y, size_z, x, y, z,
+                   link_name, touch_links = None, detach_posture = None, weight = 0.0,
+                   wait = True):
+        s = SolidPrimitive()
+        s.dimensions = [size_x, size_y, size_z]
+        s.type = s.BOX
+
+        p = Pose()
+        p.position.x = x
+        p.position.y = y
+        p.position.z = z
+        p.orientation.w = 1.0
+
+        o = self.makeSolidPrimitive(name, s, p)
+        o.header.frame_id = link_name
+        a = self.makeAttached(link_name, o, touch_links, detach_posture, weight)
+        self._attached_objects[name] = a
+        self._attached_pub.publish(a)
+        if wait:
+            self.waitForSync()
 
     ## @brief Insert new cube to planning scene
     ## @param wait When true, we wait for planning scene to actually update,
