@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-  Copyright (c) 2011-2013 Michael E. Ferguson. All right reserved.
+  Copyright (c) 2011-2014 Michael E. Ferguson. All right reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -29,9 +29,8 @@ from moveit_msgs.msg import *
 
 from chess_player.robot_defs import *
 
-from moveit_utils.arm_interface import ArmInterface
-from moveit_utils.grasping_interface import GraspingInterface
-from moveit_utils.object_interface import ObjectInterface
+from texplanner.config import planning_frame, arm_joint_names
+from texplanner.texplanner import TexPlanner, simpleLimitVelocities
 
 from geometry_msgs.msg import PoseStamped
 from moveit_msgs.msg import Grasp, GripperTranslation, PlaceLocation
@@ -604,13 +603,11 @@ class ChessArmPlanner(Thread):
     """ Chess-specific stuff """
     def __init__(self, listener = None):
         Thread.__init__(self)
-        self._grasp = GraspingInterface(GROUP_NAME_ARM, GROUP_NAME_GRIPPER)
-        self._obj = ObjectInterface(FIXED_FRAME)
         self._listener = listener
         if self._listener == None:
             self._listener = TransformListener()
         self._broadcaster = TransformBroadcaster()
-        self._move = ArmInterface(GROUP_NAME_ARM, FIXED_FRAME, self._listener)
+        self._planner = TexPlanner(rospy.get_param('chess_planner_data'))
         self.success = True
         self.transform = None
 
@@ -708,136 +705,116 @@ class ChessArmPlanner(Thread):
                 places.append(copy.deepcopy(l))
         return places
 
-    def update_objects(self, board):
-        # update table position
-        self._obj.remove('table')
-        p = PoseStamped()
-        p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
-        p.header.frame_id = self.CHESS_BOARD_FRAME
-        p.pose.position.x = SQUARE_SIZE * 4
-        p.pose.position.y = SQUARE_SIZE * 4
-        p.pose.position.z = 0
-        p.pose.orientation.x = p.pose.orientation.y = p.pose.orientation.z = 0.0
-        p.pose.orientation.w = 1.0
-        pt = self.transform_pose(p)
-
-        thickness = pt.pose.position.z
-        pt.pose.position.x = 0.255 + .375
-        pt.pose.position.z = pt.pose.position.z/2.0
-        self._obj.addBox('table', 0.75, 1.5, thickness,
-                         pt.pose.position.x, pt.pose.position.y, pt.pose.position.z, wait=False)
-        self._obj.setColor('table', 223.0/256.0, 90.0/256.0, 12.0/256.0)
-
-        # update piece positions
-        for r in [1,2,3,4,5,6,7,8]:
-            for c in 'abcdefgh':
-                p = board.getPiece(c,r)
-                if p != None:
-                    # insert this piece
-                    height = board.getPieceHeight(p.type)
-                    radius = 0.015
-                    ps = PoseStamped()
-                    ps.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
-                    ps.header.frame_id = self.CHESS_BOARD_FRAME
-                    ps.pose.position.x = p.pose.position.x
-                    ps.pose.position.y = p.pose.position.y
-                    ps.pose.position.z = height/2.0
-                    ps.pose.orientation.x = p.pose.orientation.y = p.pose.orientation.z = 0.0
-                    ps.pose.orientation.w = 1.0
-                    pt = self.transform_pose(ps)
-
-                    self._obj.addCylinder(board.getPieceId(p), height, radius, \
-                                          pt.pose.position.x, pt.pose.position.y, pt.pose.position.z, \
-                                          wait=False)
-                    if p.type < 0:
-                        self._obj.setColor(board.getPieceId(p), 0, 0, 0)
-                    else:
-                        self._obj.setColor(board.getPieceId(p), 0.8, 0.8, 0.8)
-
-        self._obj.waitForSync()
-        self._obj.sendColors()
-        rospy.loginfo('Done updating objects')
-
     def move_piece(self, name, start_pose, end_pose):
-        rospy.loginfo('Moving %s' % name)
+        rospy.loginfo('Planning to move %s' % name)
+
         # pick it up
         grasps = self.make_grasps(start_pose)
-        attempts = 0
-        while True:
-            # limit retries before we abort
-            if attempts > 10:
-                grasps = self.make_grasps(start_pose, True)  # regen grasps with wider angles
-            if attempts > 50:
-                return False
-            # attempt grasp
-            result = self._grasp.pickup(name, grasps)
-            if result == MoveItErrorCodes.SUCCESS:
-                rospy.loginfo('Pick succeeded')
-                break
-            elif result == MoveItErrorCodes.PLANNING_FAILED:
-                rospy.logerr('Pick failed in the planning stage, try again...')
-                rospy.sleep(0.5)  # short sleep to try and let state settle a bit?
-                attempts += 1
+
+        # get starting state
+        starting_pose = [self._planner.state[joint] for joint in arm_joint_names]
+        # list of [pre, grasp, retreat]
+        potential_grasp_trajectories = list()
+
+        for grasp in grasps:
+            # transform grasp_pose to planning_frame
+            grasp.grasp_pose.header.stamp = rospy.Time(0)
+            pose = self._listener.transformPose(planning_frame, grasp.grasp_pose)
+
+            # call texplanner to plan pick
+            pre_grasp_trajectory, grasp_trajectory, retreat_trajectory = self._planner.plan_grasp_trajectories(starting_pose, pose.pose)
+            if pre_grasp_trajectory == None or grasp_trajectory == None or retreat_trajectory == None:
                 continue
-            elif result == MoveItErrorCodes.CONTROL_FAILED or \
-                 result == MoveItErrorCodes.MOTION_PLAN_INVALIDATED_BY_ENVIRONMENT_CHANGE or \
-                 result == MoveItErrorCodes.TIMED_OUT:
-                rospy.logerr('Pick failed during execution, attempting to cleanup.')
-                if name in self._obj.getKnownAttachedObjects():
-                    rospy.loginfo('Pick managed to grab piece, retreat must have failed, continuing anyways')
-                    break
-                else:
-                    rospy.loginfo('Pick did not grab piece, try again...')
-                    attempts += 1
-                    continue
-            else:
-                # unhandled error, abort
-                rospy.logerr('Pick failed with error code: %d.' % result)
-                return False
+            potential_grasp_trajectories.append([pre_grasp_trajectory, grasp_trajectory, retreat_trajectory, self._planner.last_cost])
+
+        if len(potential_grasp_trajectories) == 0:
+            rospy.logerr('No valid grasps found')
+            return False
+
+        low_cost = potential_grasp_trajectories[0][3]
+        low_idx = 0
+        for i in range(len(potential_grasp_trajectories)):
+            if potential_grasp_trajectories[i][3] < low_cost:
+                low_cost = potential_grasp_trajectories[i][3]
+                low_idx = i
+
+        # stow best grasp
+        pre_grasp_trajectory = simpleLimitVelocities(potential_grasp_trajectories[low_idx][0])
+        grasp_trajectory = simpleLimitVelocities(potential_grasp_trajectories[low_idx][1])
+        grasp_retreat_trajectory = simpleLimitVelocities(potential_grasp_trajectories[low_idx][2])
 
         # put it down
-        rospy.loginfo('Placing %s' % name)
         places = self.make_places(end_pose)
-        attempts = 0
-        while True:
-            # limit retries before we abort
-            if attempts > 10:
-                places = self.make_places(end_pose, True)  # regen places with wider angles
-            if attempts > 50:
-                # TODO: try to replace piece and replan?
-                return False
-            # attempt place
-            result = self._grasp.place(name, places)
-            if result == MoveItErrorCodes.SUCCESS:
-                rospy.loginfo('Place succeeded')
-                break
-            elif result == MoveItErrorCodes.PLANNING_FAILED:
-                rospy.logerr('Place failed in the planning stage, try again...')
-                rospy.sleep(0.5)  # short sleep to try and let state settle a bit?
-                attempts += 1
+
+        # get starting state (which is end of grasp retreat)
+        starting_pose = grasp_retreat_trajectory.points[-1].positions
+        # list of [pre, grasp, retreat]
+        potential_place_trajectories = list()
+
+        for place in places:
+            # transform place_pose to planning_frame
+            place.place_pose.header.stamp = rospy.Time(0)
+            pose = self._listener.transformPose(planning_frame, place.place_pose)
+
+            # call texplanner to plan place
+            pre_place_trajectory, place_trajectory, retreat_trajectory = self._planner.plan_place_trajectories(starting_pose, pose.pose)
+            if pre_place_trajectory == None or place_trajectory == None or retreat_trajectory == None:
                 continue
-            elif result == MoveItErrorCodes.CONTROL_FAILED or \
-                 result == MoveItErrorCodes.MOTION_PLAN_INVALIDATED_BY_ENVIRONMENT_CHANGE or \
-                 result == MoveItErrorCodes.TIMED_OUT:
-                rospy.logerr('Place failed during execution, attempting to cleanup.')
-                if name in self._obj.getKnownAttachedObjects():
-                    rospy.loginfo('Place did not place object, approach must have failed, will retry...')
-                    attempts += 1
-                    continue
-                else:
-                    rospy.loginfo('Object no longer in gripper, must be placed, continuing...')
-                    break
-            else:
-                # unhandled error
-                rospy.logerr('Place failed with error code: %d.' % result)
-                # TODO: try to replace piece and replan?
-                return False
+            potential_place_trajectories.append([pre_place_trajectory, place_trajectory, retreat_trajectory, self._planner.last_cost])
+
+        if len(potential_place_trajectories) == 0:
+            return False
+        low_cost = potential_place_trajectories[0][3]
+        low_idx = 0
+        for i in range(len(potential_place_trajectories)):
+            if potential_place_trajectories[i][3] < low_cost:
+                low_cost = potential_place_trajectories[i][3]
+                low_idx = i
+
+        # stow best place
+        pre_place_trajectory = simpleLimitVelocities(potential_grasp_trajectories[low_idx][0])
+        place_trajectory = simpleLimitVelocities(potential_grasp_trajectories[low_idx][1])
+        place_retreat_trajectory = simpleLimitVelocities(potential_grasp_trajectories[low_idx][2])
+
+        # Execute pre-grasp
+        rospy.loginfo('Picking %s' % name)
+        if not self._planner.executeTrajectory(pre_grasp_trajectory):
+            rospy.logerr('Pre grasp failed to execute')
+            return False
+        # Execute grasp trajectory
+        if not self._planner.executeTrajectory(grasp_trajectory):
+            rospy.logerr('Grasp failed to execute')
+            return False
+        # Close gripper
+        if not self._planner.executeGripperAction(0.0):
+            rospy.logerr('Gripper closing failed')
+            return False
+        # Execute retreat
+        if not self._planner.executeTrajectory(grasp_retreat_trajectory):
+            rospy.logerr('Grasp retreat failed to execute')
+            return False
+
+        # Execute pre-place
+        rospy.loginfo('Placing %s' % name)
+        if not self._planner.executeTrajectory(pre_place_trajectory):
+            rospy.logerr('Pre place failed to execute')
+            return False
+        # Execute place trajectory
+        if not self._planner.executeTrajectory(place_trajectory):
+            rospy.logerr('Place failed to execute')
+            return False
+        # Open gripper
+        if not self._planner.executeGripperAction(0.045):
+            rospy.logerr('Gripper opening failed')
+            return False
+        # Execute retreat
+        if not self._planner.executeTrajectory(place_retreat_trajectory):
+            rospy.logerr('Place retreat failed to execute')
+            return False
         return True
 
     def execute(self, move, board):
         """ Execute a move. """
-
-        self.update_objects(board)
 
         # get info about move
         (col_f, rank_f) = board.toPosition(move[0:2])
@@ -886,9 +863,6 @@ class ChessArmPlanner(Thread):
                 self.tuck()
                 return None
 
-            # remove from planning scene
-            self._obj.remove(to_id)
-
         to = PoseStamped()
         to.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
         to.header.frame_id = "chess_board"
@@ -910,7 +884,6 @@ class ChessArmPlanner(Thread):
         return to.pose
 
     def getPose(self, col, rank, board, z=0):
-        """ Find the reach required to get to a position """
         p = Pose()
         if board.side == board.WHITE:
             p.position.x = (col * SQUARE_SIZE) + SQUARE_SIZE/2
@@ -923,12 +896,8 @@ class ChessArmPlanner(Thread):
         return p
 
     def tuck(self):
-        if joints_tucked:
-            self._move.moveToJointPosition(joint_names, joints_tucked)
-        else:
-            self._move.moveToJointPosition(joint_names, joints_ready)
+        self._planner.moveTo(joints_ready)
 
     def untuck(self):
-        if joints_untucked:
-            self._move.moveToJointPosition(joint_names, joints_untucked)
+        pass
 
