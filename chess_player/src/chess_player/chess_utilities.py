@@ -611,6 +611,10 @@ class ChessArmPlanner(Thread):
         self.success = True
         self.transform = None
 
+        # Open gripper at start (since we don't open at beginning of pick like MoveIt does)
+        if not self._planner.executeGripperAction(GRIPPER_OPEN/2):
+            rospy.logerr('Gripper opening failed')
+
     def run(self):
         while not rospy.is_shutdown():
             if self.transform != None:
@@ -786,7 +790,7 @@ class ChessArmPlanner(Thread):
             rospy.logerr('Grasp failed to execute')
             return False
         # Close gripper
-        if not self._planner.executeGripperAction(0.0):
+        if not self._planner.executeGripperAction(GRIPPER_CLOSED/2):
             rospy.logerr('Gripper closing failed')
             return False
         # Execute retreat
@@ -804,7 +808,7 @@ class ChessArmPlanner(Thread):
             rospy.logerr('Place failed to execute')
             return False
         # Open gripper
-        if not self._planner.executeGripperAction(0.045):
+        if not self._planner.executeGripperAction(GRIPPER_OPEN/2):
             rospy.logerr('Gripper opening failed')
             return False
         # Execute retreat
