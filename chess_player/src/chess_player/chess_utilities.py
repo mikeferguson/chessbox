@@ -772,9 +772,9 @@ class ChessArmPlanner(Thread):
                 low_idx = i
 
         # stow best place
-        pre_place_trajectory = simpleLimitVelocities(potential_grasp_trajectories[low_idx][0])
-        place_trajectory = simpleLimitVelocities(potential_grasp_trajectories[low_idx][1])
-        place_retreat_trajectory = simpleLimitVelocities(potential_grasp_trajectories[low_idx][2])
+        pre_place_trajectory = simpleLimitVelocities(potential_place_trajectories[low_idx][0])
+        place_trajectory = simpleLimitVelocities(potential_place_trajectories[low_idx][1])
+        place_retreat_trajectory = simpleLimitVelocities(potential_place_trajectories[low_idx][2])
 
         # Execute pre-grasp
         rospy.loginfo('Picking %s' % name)
