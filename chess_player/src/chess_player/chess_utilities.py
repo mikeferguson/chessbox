@@ -736,7 +736,7 @@ class ChessArmPlanner(Thread):
         # limit velocities
         pre_grasp_trajectory = simpleLimitVelocities(pre_grasp_trajectory)
         grasp_trajectory = simpleLimitVelocities(grasp_trajectory)
-        grasp_retreat_trajectory = simpleLimitVelocities(grasp_retreat_trajectory)
+        grasp_retreat_trajectory = simpleLimitVelocities(retreat_trajectory)
 
         # put it down
         places = self.make_places(end_pose)
@@ -760,9 +760,9 @@ class ChessArmPlanner(Thread):
             return False
 
         # limit velocities
-        pre_place_trajectory = simpleLimitVelocities(potential_place_trajectories[low_idx][0])
-        place_trajectory = simpleLimitVelocities(potential_place_trajectories[low_idx][1])
-        place_retreat_trajectory = simpleLimitVelocities(potential_place_trajectories[low_idx][2])
+        pre_place_trajectory = simpleLimitVelocities(pre_place_trajectory)
+        place_trajectory = simpleLimitVelocities(place_trajectory)
+        place_retreat_trajectory = simpleLimitVelocities(retreat_trajectory)
 
         # Execute pre-grasp
         rospy.loginfo('Picking %s' % name)
