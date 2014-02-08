@@ -717,8 +717,6 @@ class ChessArmPlanner(Thread):
 
         # get starting state
         starting_pose = [self._planner.state[joint] for joint in arm_joint_names]
-        # list of [pre, grasp, retreat]
-        potential_grasp_trajectories = list()
 
         for grasp in grasps:
             # transform grasp_pose to planning_frame
@@ -729,31 +727,22 @@ class ChessArmPlanner(Thread):
             pre_grasp_trajectory, grasp_trajectory, retreat_trajectory = self._planner.plan_grasp_trajectories(starting_pose, pose.pose)
             if pre_grasp_trajectory == None or grasp_trajectory == None or retreat_trajectory == None:
                 continue
-            potential_grasp_trajectories.append([pre_grasp_trajectory, grasp_trajectory, retreat_trajectory, self._planner.last_cost])
+            break
 
-        if len(potential_grasp_trajectories) == 0:
+        if pre_grasp_trajectory == None or grasp_trajectory == None or retreat_trajectory == None:
             rospy.logerr('No valid grasps found')
             return False
 
-        low_cost = potential_grasp_trajectories[0][3]
-        low_idx = 0
-        for i in range(len(potential_grasp_trajectories)):
-            if potential_grasp_trajectories[i][3] < low_cost:
-                low_cost = potential_grasp_trajectories[i][3]
-                low_idx = i
-
-        # stow best grasp
-        pre_grasp_trajectory = simpleLimitVelocities(potential_grasp_trajectories[low_idx][0])
-        grasp_trajectory = simpleLimitVelocities(potential_grasp_trajectories[low_idx][1])
-        grasp_retreat_trajectory = simpleLimitVelocities(potential_grasp_trajectories[low_idx][2])
+        # limit velocities
+        pre_grasp_trajectory = simpleLimitVelocities(pre_grasp_trajectory)
+        grasp_trajectory = simpleLimitVelocities(grasp_trajectory)
+        grasp_retreat_trajectory = simpleLimitVelocities(grasp_retreat_trajectory)
 
         # put it down
         places = self.make_places(end_pose)
 
         # get starting state (which is end of grasp retreat)
         starting_pose = grasp_retreat_trajectory.points[-1].positions
-        # list of [pre, grasp, retreat]
-        potential_place_trajectories = list()
 
         for place in places:
             # transform place_pose to planning_frame
@@ -764,18 +753,13 @@ class ChessArmPlanner(Thread):
             pre_place_trajectory, place_trajectory, retreat_trajectory = self._planner.plan_place_trajectories(starting_pose, pose.pose)
             if pre_place_trajectory == None or place_trajectory == None or retreat_trajectory == None:
                 continue
-            potential_place_trajectories.append([pre_place_trajectory, place_trajectory, retreat_trajectory, self._planner.last_cost])
+            break
 
-        if len(potential_place_trajectories) == 0:
+        if pre_place_trajectory == None or place_trajectory == None or retreat_trajectory == None:
+            rospy.logerr('No valid places found')
             return False
-        low_cost = potential_place_trajectories[0][3]
-        low_idx = 0
-        for i in range(len(potential_place_trajectories)):
-            if potential_place_trajectories[i][3] < low_cost:
-                low_cost = potential_place_trajectories[i][3]
-                low_idx = i
 
-        # stow best place
+        # limit velocities
         pre_place_trajectory = simpleLimitVelocities(potential_place_trajectories[low_idx][0])
         place_trajectory = simpleLimitVelocities(potential_place_trajectories[low_idx][1])
         place_retreat_trajectory = simpleLimitVelocities(potential_place_trajectories[low_idx][2])
