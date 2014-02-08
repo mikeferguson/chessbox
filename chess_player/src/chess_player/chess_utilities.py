@@ -700,7 +700,7 @@ class ChessArmPlanner(Thread):
         places = []
         for y in [-1.57, -0.78, 0, 0.78, 1.57]:
             for p in pitch_vals:
-                q = quaternion_from_euler(0, p, y)  # now in object frame
+                q = quaternion_from_euler(0, 1.57-p, y)  # no longer in object frame
                 l.place_pose.pose.orientation.x = q[0]
                 l.place_pose.pose.orientation.y = q[1]
                 l.place_pose.pose.orientation.z = q[2]
