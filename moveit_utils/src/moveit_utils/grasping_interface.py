@@ -64,7 +64,8 @@ class GraspingInterface:
         #g.planner_id = ??
         g.allowed_touch_objects = allowed_touch_objects
         g.allowed_planning_time = 30.0
-        #g.planning_options.planning_scene_diff = ??
+        g.planning_options.planning_scene_diff.is_diff = True
+        g.planning_options.planning_scene_diff.robot_state.is_diff = True
         g.planning_options.plan_only = self._plan_only
         self._pick_action.send_goal(g)
         self._pick_action.wait_for_result()
@@ -92,7 +93,8 @@ class GraspingInterface:
         #g.planner_id = ??
         g.allowed_touch_objects = allowed_touch_objects
         g.allowed_planning_time = 30.0
-        #g.planning_options.planning_scene_diff = ??
+        g.planning_options.planning_scene_diff.is_diff = True
+        g.planning_options.planning_scene_diff.robot_state.is_diff = True
         g.planning_options.plan_only = self._plan_only
         self._place_action.send_goal(g)
         self._place_action.wait_for_result()
