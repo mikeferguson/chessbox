@@ -38,9 +38,9 @@ class ObjectInterface:
         self._fixed_frame = frame
 
         # publisher to send objects to MoveIt
-        self._pub = rospy.Publisher('collision_object', CollisionObject)
-        self._attached_pub = rospy.Publisher('attached_collision_object', AttachedCollisionObject)
-        self._scene_pub = rospy.Publisher('planning_scene', PlanningScene)
+        self._pub = rospy.Publisher('collision_object', CollisionObject, queue_size=10)
+        self._attached_pub = rospy.Publisher('attached_collision_object', AttachedCollisionObject, queue_size=10)
+        self._scene_pub = rospy.Publisher('planning_scene', PlanningScene, queue_size=10)
 
         # track the attached and collision objects
         self._mutex = thread.allocate_lock()
