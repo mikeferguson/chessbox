@@ -28,10 +28,7 @@ from geometry_msgs.msg import Pose, PoseStamped
 from moveit_msgs.msg import *
 
 from chess_player.robot_defs import *
-
-from moveit_utils.arm_interface import ArmInterface
-from moveit_utils.grasping_interface import GraspingInterface
-from moveit_utils.object_interface import ObjectInterface
+from moveit_python import *
 
 from geometry_msgs.msg import PoseStamped
 from moveit_msgs.msg import Grasp, GripperTranslation, PlaceLocation
@@ -604,13 +601,13 @@ class ChessArmPlanner(Thread):
     """ Chess-specific stuff """
     def __init__(self, listener = None):
         Thread.__init__(self)
-        self._grasp = GraspingInterface(GROUP_NAME_ARM, GROUP_NAME_GRIPPER)
-        self._obj = ObjectInterface(FIXED_FRAME)
+        self._grasp = PickPlaceInterface(GROUP_NAME_ARM, GROUP_NAME_GRIPPER)
+        self._obj = PlanningSceneInterface(FIXED_FRAME)
         self._listener = listener
         if self._listener == None:
             self._listener = TransformListener()
         self._broadcaster = TransformBroadcaster()
-        self._move = ArmInterface(GROUP_NAME_ARM, FIXED_FRAME, self._listener)
+        self._move = MoveGroupInterface(GROUP_NAME_ARM, FIXED_FRAME, self._listener)
         self.success = True
         self.transform = None
 

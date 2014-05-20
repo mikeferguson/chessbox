@@ -1,6 +1,6 @@
 <package>
   <name>chess_player</name>
-  <version>0.2.0</version>
+  <version>0.3.0</version>
   <description>
     Executive for AAAI Chess 2011.
   </description>
@@ -11,15 +11,16 @@
   
   <buildtool_depend>catkin</buildtool_depend>
 
-  <run_depend>rospy</run_depend>
   <run_depend>actionlib</run_depend>
-  <run_depend>std_srvs</run_depend>
   <run_depend>chess_msgs</run_depend>
-  <run_depend>sensor_msgs</run_depend>
-  <run_depend>geometry_msgs</run_depend>
-  <run_depend>diagnostic_msgs</run_depend>
-  <run_depend>trajectory_msgs</run_depend>
   <run_depend>control_msgs</run_depend>
+  <run_depend>diagnostic_msgs</run_depend>
+  <run_depend>geometry_msgs</run_depend>
+  <run_depend>moveit_python</run_depend>
+  <run_depend>rospy</run_depend>
+  <run_depend>sensor_msgs</run_depend>
+  <run_depend>std_srvs</run_depend>
   <run_depend>tf</run_depend>
+  <run_depend>trajectory_msgs</run_depend>
 
 </package>
