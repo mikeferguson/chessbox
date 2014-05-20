@@ -707,7 +707,7 @@ class ChessArmPlanner(Thread):
 
     def update_objects(self, board):
         # update table position
-        self._obj.remove('table')
+        self._obj.removeCollisionObject('table')
         p = PoseStamped()
         p.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
         p.header.frame_id = self.CHESS_BOARD_FRAME
@@ -884,7 +884,7 @@ class ChessArmPlanner(Thread):
                 return None
 
             # remove from planning scene
-            self._obj.remove(to_id)
+            self._obj.removeCollisionObject(to_id)
 
         to = PoseStamped()
         to.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
