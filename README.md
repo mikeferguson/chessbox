@@ -5,8 +5,8 @@ This is the n-th generation chess code, which was originally developed for AAAI 
 ## Installation
 
     sudo apt-get install gnuchess gnuchess-book python-pexpect
-    sudo apt-get install festlex-cmu ros-groovy-audio-common
-    sudo apt-get install ros-hydro-moveit-full
+    sudo apt-get install festlex-cmu
+    sudo apt-get install ros-hydro-moveit-full ros-hydro-moveit-python
 
     cd <catkin_ws>/src
     wstool init
