@@ -768,17 +768,17 @@ class ChessArmPlanner(Thread):
                 return False
             # attempt grasp
             result = self._grasp.pickup(name, grasps)
-            if result == MoveItErrorCodes.SUCCESS:
+            if result.error_code.val == MoveItErrorCodes.SUCCESS:
                 rospy.loginfo('Pick succeeded')
                 break
-            elif result == MoveItErrorCodes.PLANNING_FAILED:
+            elif result.error_code.val == MoveItErrorCodes.PLANNING_FAILED:
                 rospy.logerr('Pick failed in the planning stage, try again...')
                 rospy.sleep(0.5)  # short sleep to try and let state settle a bit?
                 attempts += 1
                 continue
-            elif result == MoveItErrorCodes.CONTROL_FAILED or \
-                 result == MoveItErrorCodes.MOTION_PLAN_INVALIDATED_BY_ENVIRONMENT_CHANGE or \
-                 result == MoveItErrorCodes.TIMED_OUT:
+            elif result.error_code.val == MoveItErrorCodes.CONTROL_FAILED or \
+                 result.error_code.val == MoveItErrorCodes.MOTION_PLAN_INVALIDATED_BY_ENVIRONMENT_CHANGE or \
+                 result.error_code.val == MoveItErrorCodes.TIMED_OUT:
                 rospy.logerr('Pick failed during execution, attempting to cleanup.')
                 if name in self._obj.getKnownAttachedObjects():
                     rospy.loginfo('Pick managed to grab piece, retreat must have failed, continuing anyways')
@@ -789,7 +789,7 @@ class ChessArmPlanner(Thread):
                     continue
             else:
                 # unhandled error, abort
-                rospy.logerr('Pick failed with error code: %d.' % result)
+                rospy.logerr('Pick failed with error code: %d.' % result.error_code.val)
                 return False
 
         # put it down
@@ -805,17 +805,17 @@ class ChessArmPlanner(Thread):
                 return False
             # attempt place
             result = self._grasp.place(name, places)
-            if result == MoveItErrorCodes.SUCCESS:
+            if result.error_code.val == MoveItErrorCodes.SUCCESS:
                 rospy.loginfo('Place succeeded')
                 break
-            elif result == MoveItErrorCodes.PLANNING_FAILED:
+            elif result.error_code.val == MoveItErrorCodes.PLANNING_FAILED:
                 rospy.logerr('Place failed in the planning stage, try again...')
                 rospy.sleep(0.5)  # short sleep to try and let state settle a bit?
                 attempts += 1
                 continue
-            elif result == MoveItErrorCodes.CONTROL_FAILED or \
-                 result == MoveItErrorCodes.MOTION_PLAN_INVALIDATED_BY_ENVIRONMENT_CHANGE or \
-                 result == MoveItErrorCodes.TIMED_OUT:
+            elif result.error_code.val == MoveItErrorCodes.CONTROL_FAILED or \
+                 result.error_code.val == MoveItErrorCodes.MOTION_PLAN_INVALIDATED_BY_ENVIRONMENT_CHANGE or \
+                 result.error_code.val == MoveItErrorCodes.TIMED_OUT:
                 rospy.logerr('Place failed during execution, attempting to cleanup.')
                 if name in self._obj.getKnownAttachedObjects():
                     rospy.loginfo('Place did not place object, approach must have failed, will retry...')
@@ -826,7 +826,7 @@ class ChessArmPlanner(Thread):
                     break
             else:
                 # unhandled error
-                rospy.logerr('Place failed with error code: %d.' % result)
+                rospy.logerr('Place failed with error code: %d.' % result.error_code.val)
                 # TODO: try to replace piece and replan?
                 return False
         return True
