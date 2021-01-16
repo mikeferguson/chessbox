@@ -34,8 +34,8 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef CHESS_PERCEPTION_CONVERSIONS_H_
-#define CHESS_PERCEPTION_CONVERSIONS_H_
+#ifndef CHESS_PERCEPTION_CONVERSIONS_H
+#define CHESS_PERCEPTION_CONVERSIONS_H
 
 namespace pcl_broke_again
 {
@@ -73,6 +73,6 @@ toROSMsg (const CloudT& cloud, sensor_msgs::Image& msg)
   }
 }
 
-}
+}  // namespace pcl_broke_again
 
-#endif
+#endif  // CHESS_PERCEPTION_CONVERSIONS_H

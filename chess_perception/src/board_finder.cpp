@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2011-2013 Michael E. Ferguson.  All right reserved.
+Copyright (c) 2011-2021 Michael E. Ferguson.  All right reserved.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -197,15 +197,15 @@ bool BoardFinder::findBoard(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
         {
             cv::Vec4i l = h_lines[i];
             if(i%2 == 0)
-                cv::line( cdst, cv::Point(l[0], l[1]), cv::Point(l[2], l[3]), cv::Scalar(0,0,255), 2, CV_AA);
+                cv::line(cdst, cv::Point(l[0], l[1]), cv::Point(l[2], l[3]), cv::Scalar(0,0,255), 2, cv::LineTypes::LINE_AA);
             else
-                cv::line( cdst, cv::Point(l[0], l[1]), cv::Point(l[2], l[3]), cv::Scalar(255,0,255), 2, CV_AA);
+                cv::line(cdst, cv::Point(l[0], l[1]), cv::Point(l[2], l[3]), cv::Scalar(255,0,255), 2, cv::LineTypes::LINE_AA);
         }
         ROS_DEBUG("vertical lines: %d", (int) v_lines.size());
         for( size_t i = 0; i < v_lines.size(); i++ )
         {
             cv::Vec4i l = v_lines[i];
-            cv::line( cdst, cv::Point(l[0], l[1]), cv::Point(l[2], l[3]), cv::Scalar(0,255,0), 2, CV_AA);
+            cv::line( cdst, cv::Point(l[0], l[1]), cv::Point(l[2], l[3]), cv::Scalar(0,255,0), 2,  cv::LineTypes::LINE_AA);
         }
     }
 

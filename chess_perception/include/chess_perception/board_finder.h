@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2011-2013 Michael E. Ferguson.  All right reserved.
+Copyright (c) 2011-2021 Michael E. Ferguson.  All right reserved.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -18,8 +18,8 @@ Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 **/
 
-#ifndef POINT_FINDER_H_
-#define POINT_FINDER_H_
+#ifndef CHESS_PERCEPTION_POINT_FINDER_H
+#define CHESS_PERCEPTION_POINT_FINDER_H
 
 #include <ros/ros.h>
 #include <tf/transform_broadcaster.h> // TODO: find appropriate include file
@@ -30,7 +30,7 @@ Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #include <chess_perception/conversions.h>
 #include <cv_bridge/cv_bridge.h>
 
-#include <opencv/cv.h>
+#include <opencv2/opencv.hpp>
 #include <image_transport/image_transport.h>
 
 #include <pcl/registration/transformation_estimation_svd.h>
@@ -85,4 +85,4 @@ class BoardFinder
     pcl::registration::TransformationEstimationSVD<pcl::PointXYZRGB, pcl::PointXYZ> reg_;
 };
 
-#endif
+#endif  // CHESS_PERCEPTION_POINT_FINDER_H

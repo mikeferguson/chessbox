@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2011-2013 Michael E. Ferguson.  All right reserved.
+Copyright (c) 2011-2021 Michael E. Ferguson.  All right reserved.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -18,8 +18,8 @@ Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 **/
 
-#ifndef PIECE_FINDER_H_
-#define PIECE_FINDER_H_
+#ifndef CHESS_PERCEPTION_PIECE_FINDER_H
+#define CHESS_PERCEPTION_PIECE_FINDER_H
 
 #include <ros/ros.h>
 #include <pcl_ros/point_cloud.h>
@@ -66,4 +66,4 @@ class PieceFinder
     pcl::PointCloud<pcl::PointXYZRGB> hull_untransformed_;
 };
 
-#endif
+#endif  // CHESS_PERCEPTION_PIECE_FINDER_H
