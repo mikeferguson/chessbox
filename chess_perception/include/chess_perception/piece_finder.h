@@ -35,35 +35,35 @@ Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 class PieceFinder
 {
-  public:
-    PieceFinder();
-    virtual ~PieceFinder() {};
+public:
+  PieceFinder();
+  virtual ~PieceFinder() {};
 
-    /** \brief Finds pieces on a table.
-     *
-     *  \returns number of pieces found.
-     */
-    int findPieces(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
-                   tf::Transform& board_transform,
-                   std::vector<pcl::PointXYZ>& pieces,
-                   std::vector<double>& weights);
+  /**
+   * @brief Finds pieces on a table.
+   * @returns number of pieces found.
+   */
+  size_t findPieces(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
+                    tf::Transform& board_transform,
+                    std::vector<pcl::PointXYZ>& pieces,
+                    std::vector<double>& weights);
 
-    /** \brief Set the size of a square on our chess board. */
-    void setSquareSize(double size);
+  /** @brief Set the size of a square on our chess board. */
+  void setSquareSize(double size);
 
-  private:
-    void setupUntransformedHull();
+private:
+  void setupUntransformedHull();
 
-    bool debug_;
-    int threshold_;
-    double square_size_;
+  bool debug_;
+  int threshold_;
+  double square_size_;
 
-    pcl::ExtractPolygonalPrismData<pcl::PointXYZRGB> extract_data_;
-    pcl::ExtractIndices<pcl::PointXYZRGB> extract_indices_;
-    pcl::EuclideanClusterExtraction<pcl::PointXYZRGB> cluster_;
+  pcl::ExtractPolygonalPrismData<pcl::PointXYZRGB> extract_data_;
+  pcl::ExtractIndices<pcl::PointXYZRGB> extract_indices_;
+  pcl::EuclideanClusterExtraction<pcl::PointXYZRGB> cluster_;
 
-    ros::Publisher pieces_cloud_pub_;
-    pcl::PointCloud<pcl::PointXYZRGB> hull_untransformed_;
+  ros::Publisher pieces_cloud_pub_;
+  pcl::PointCloud<pcl::PointXYZRGB> hull_untransformed_;
 };
 
 #endif  // CHESS_PERCEPTION_PIECE_FINDER_H
