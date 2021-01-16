@@ -250,13 +250,56 @@ bool BoardFinder::findBoard(
       {
         /* Test if this really is a checkerboard intersection by checking
          * the color of points on four sides.
-         * TODO: this is a mockup, add a real check
          */
-        if (src.at<unsigned char>(p.y + 7, p.x + 7) < 120)
+        unsigned dark_pixels[4] = {0, 0, 0, 0};
+        unsigned light_pixels[4] = {0, 0, 0, 0};
+        for (int x = 3; x < 12; ++x)
         {
-          if (src.at<unsigned char>(p.y + 7, p.x - 7) < 120 ||
-              src.at<unsigned char>(p.y - 7, p.x - 7) > 120 ||
-              src.at<unsigned char>(p.y - 7, p.x + 7) < 120)
+          for (int y = 3; y < 12; ++y)
+          {
+            if (src.at<unsigned char>(p.y + y, p.x + x) < 120)
+            {
+              ++dark_pixels[0];
+            }
+            else
+            {
+              ++light_pixels[0];
+            }
+
+            if (src.at<unsigned char>(p.y + y, p.x - x) < 120)
+            {
+              ++dark_pixels[1];
+            }
+            else
+            {
+              ++light_pixels[1];
+            }
+
+            if (src.at<unsigned char>(p.y - y, p.x - x) < 120)
+            {
+              ++dark_pixels[2];
+            }
+            else
+            {
+              ++light_pixels[2];
+            }
+
+            if (src.at<unsigned char>(p.y - y, p.x + x) < 120)
+            {
+              ++dark_pixels[3];
+            }
+            else
+            {
+              ++light_pixels[3];
+            }
+          }
+        }
+
+        if (dark_pixels[0] > light_pixels[0])
+        {
+          if (dark_pixels[1] > light_pixels[1] ||
+              dark_pixels[2] < light_pixels[2] ||
+              dark_pixels[3] > light_pixels[3])
           {
             if (debug_)
             {
@@ -267,9 +310,9 @@ bool BoardFinder::findBoard(
         }
         else
         {
-          if (src.at<unsigned char>(p.y + 7, p.x - 7) > 120 ||
-              src.at<unsigned char>(p.y - 7, p.x - 7) < 120 ||
-              src.at<unsigned char>(p.y - 7, p.x + 7) > 120)
+          if (dark_pixels[1] < light_pixels[1] ||
+              dark_pixels[2] > light_pixels[2] ||
+              dark_pixels[3] < light_pixels[3])
           {
             if (debug_)
             {
@@ -286,7 +329,7 @@ bool BoardFinder::findBoard(
         }
       }
     }
-    if (temp_lines.size() > 5)
+    if (temp_lines.size() >= 5)
     {
       std::stable_sort(temp_lines.begin(), temp_lines.end(), orderPointsX);
       corner_points_2d.push_back(temp_lines);
