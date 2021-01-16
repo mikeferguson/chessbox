@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-  Copyright (c) 2011-2013 Michael E. Ferguson. All right reserved.
+  Copyright (c) 2011-2021 Michael E. Ferguson. All right reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -23,19 +23,18 @@ import rospy    # for logging
 import pexpect  # for connecting to gnu chess
 import threading
 
-from chess_msgs.msg import *
+from chess_msgs.msg import ChessPiece, ChessBoard
 from geometry_msgs.msg import Pose, PoseStamped
-from moveit_msgs.msg import *
 
 from chess_player.robot_defs import *
-from moveit_python import *
+from moveit_python import MoveGroupInterface, PickPlaceInterface, PlanningSceneInterface
 
 from geometry_msgs.msg import PoseStamped
 from moveit_msgs.msg import Grasp, GripperTranslation, PlaceLocation
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
-from tf.broadcaster import *
-from tf.listener import *
+from tf.broadcaster import TransformBroadcaster
+from tf.listener import TransformListener
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
 from threading import Thread
@@ -122,7 +121,7 @@ class BoardState:
         try:
             self.values[int(int(rank)-1)*8+self.getColIdx(column)] = piece
         except:
-            print column, rank
+            print(column, rank)
             rospy.loginfo("setPiece: invalid row/column")
 
     def getPiece(self, column, rank):
@@ -143,19 +142,19 @@ class BoardState:
                 for c in 'abcdefgh':
                     p = self.getPiece(c,r)    # print a8 first
                     if p == None:
-                        print " ",
+                        print(" ", end="")
                     else:
-                        print self.getPieceName(p.type),
-                print ""
+                        print(self.getPieceName(p.type), end="")
+                print("")
         else:
             for r in [1,2,3,4,5,6,7,8]:
                 for c in 'hgfedcba':
                     p = self.getPiece(c,r)    # print h1 first
                     if p == None:
-                        print " ",
+                        print(" ", end="")
                     else:
-                        print self.getPieceName(p.type),
-                print ""
+                        print(self.getPieceName(p.type), end="")
+                print("")
 
         for r in [8,7,6,5,4,3,2,1]:
             for c in 'abcdefgh':
@@ -299,9 +298,9 @@ class BoardState:
         return 0.045  # default
 
     def getMoveText(self, move):
-        print move
-        (col_f, rank_f) = self.toPosition(move[0:2])
-        (col_t, rank_t) = self.toPosition(move[2:])
+        print(move)
+        col_f, rank_f = self.toPosition(move[0:2])
+        col_t, rank_t = self.toPosition(move[2:])
         piece = self.getPiece(col_f, rank_f)
         if piece == None:
             piece = self.getPiece(col_t, rank_t)
@@ -397,7 +396,7 @@ class BoardUpdater:
                 col = self.board.getColName(7 - int(piece.pose.position.x/SQUARE_SIZE))
                 rank = 8 - int(piece.pose.position.y/SQUARE_SIZE)
             if not self.board.valid(col, rank):
-                print "invalid: ", col, rank
+                print("invalid: ", col, rank)
                 continue
 
             # update temp board
@@ -453,7 +452,7 @@ class BoardUpdater:
                 rospy.loginfo("Castling, %s" % self.board.castling_move)
 
                 m = self.board.castling_move
-                print m
+                print(m)
                 #self.copyType(m[0], m[1], m[2], m[3], temp_board)
                 to = ChessPiece()
                 to.type = self.board.side * ChessPiece.BLACK_KING
@@ -464,7 +463,7 @@ class BoardUpdater:
                 temp_board.setPiece(m[2],int(m[3]),to)
 
                 m = castling_extras[m]
-                print m
+                print(m)
                 #self.copyType(m[0], m[1], m[2], m[3], temp_board)
                 to = ChessPiece()
                 to.type = self.board.side * ChessPiece.BLACK_ROOK
@@ -580,8 +579,8 @@ class GnuChessEngine:
         return m
 
     def nextMoveUser(self, move="go", board=None):
-        print "Please enter a move"
-        return raw_input().rstrip()
+        print("Please enter a move")
+        return input().rstrip()
 
     def startPawning(self):
         self.history = self.history[0:-1]
@@ -589,9 +588,9 @@ class GnuChessEngine:
         self.history.append("Now pawning.")
 
     def exit(self):
-        print "game review:"
+        print("game review:")
         for h in self.history:
-            print h
+            print(h)
         self.engine.sendline('exit')
 
 class ChessArmPlanner(Thread):
@@ -722,7 +721,7 @@ class ChessArmPlanner(Thread):
         pt.pose.position.x = 0.255 + .375
         pt.pose.position.z = pt.pose.position.z/2.0
         self._obj.addBox('table', 0.75, 1.5, thickness,
-                         pt.pose.position.x, pt.pose.position.y, pt.pose.position.z, wait=False)
+                         pt.pose.position.x, pt.pose.position.y, pt.pose.position.z)
         self._obj.setColor('table', 223.0/256.0, 90.0/256.0, 12.0/256.0)
 
         # update piece positions
@@ -744,8 +743,7 @@ class ChessArmPlanner(Thread):
                     pt = self.transform_pose(ps)
 
                     self._obj.addCylinder(board.getPieceId(p), height, radius, \
-                                          pt.pose.position.x, pt.pose.position.y, pt.pose.position.z, \
-                                          wait=False)
+                                          pt.pose.position.x, pt.pose.position.y, pt.pose.position.zx)
                     if p.type < 0:
                         self._obj.setColor(board.getPieceId(p), 0, 0, 0)
                     else:
@@ -759,77 +757,22 @@ class ChessArmPlanner(Thread):
         rospy.loginfo('Moving %s' % name)
         # pick it up
         grasps = self.make_grasps(start_pose)
-        attempts = 0
-        while True:
-            # limit retries before we abort
-            if attempts > 10:
-                grasps = self.make_grasps(start_pose, True)  # regen grasps with wider angles
-            if attempts > 50:
-                return False
-            # attempt grasp
-            result = self._grasp.pickup(name, grasps)
-            if result.error_code.val == MoveItErrorCodes.SUCCESS:
-                rospy.loginfo('Pick succeeded')
-                break
-            elif result.error_code.val == MoveItErrorCodes.PLANNING_FAILED:
-                rospy.logerr('Pick failed in the planning stage, try again...')
-                rospy.sleep(0.5)  # short sleep to try and let state settle a bit?
-                attempts += 1
-                continue
-            elif result.error_code.val == MoveItErrorCodes.CONTROL_FAILED or \
-                 result.error_code.val == MoveItErrorCodes.MOTION_PLAN_INVALIDATED_BY_ENVIRONMENT_CHANGE or \
-                 result.error_code.val == MoveItErrorCodes.TIMED_OUT:
-                rospy.logerr('Pick failed during execution, attempting to cleanup.')
-                if name in self._obj.getKnownAttachedObjects():
-                    rospy.loginfo('Pick managed to grab piece, retreat must have failed, continuing anyways')
-                    break
-                else:
-                    rospy.loginfo('Pick did not grab piece, try again...')
-                    attempts += 1
-                    continue
-            else:
-                # unhandled error, abort
-                rospy.logerr('Pick failed with error code: %d.' % result.error_code.val)
+        success, _ = self._grasp.pick_with_retry(name, grasps, 10, support_name="table")
+        if not success:
+            grasps = self.make_grasps(start_pose, True)  # regen grasps with wider angles
+            success, _ = self._grasp.pick_with_retry(name, grasps, 10, support_name="table")
+            if not success:
                 return False
 
         # put it down
         rospy.loginfo('Placing %s' % name)
         places = self.make_places(end_pose)
-        attempts = 0
-        while True:
-            # limit retries before we abort
-            if attempts > 10:
-                places = self.make_places(end_pose, True)  # regen places with wider angles
-            if attempts > 50:
-                # TODO: try to replace piece and replan?
+        success, _ = self._grasp.place_with_retry(name, places, 10, support_name="table")
+        if not success:
+            places = self.make_places(end_pose, True)  # regen places with wider angles
+            success, _ = self._grasp.place_with_retry(name, places, 10, support_name="table")
+            if not success:
                 return False
-            # attempt place
-            result = self._grasp.place(name, places)
-            if result.error_code.val == MoveItErrorCodes.SUCCESS:
-                rospy.loginfo('Place succeeded')
-                break
-            elif result.error_code.val == MoveItErrorCodes.PLANNING_FAILED:
-                rospy.logerr('Place failed in the planning stage, try again...')
-                rospy.sleep(0.5)  # short sleep to try and let state settle a bit?
-                attempts += 1
-                continue
-            elif result.error_code.val == MoveItErrorCodes.CONTROL_FAILED or \
-                 result.error_code.val == MoveItErrorCodes.MOTION_PLAN_INVALIDATED_BY_ENVIRONMENT_CHANGE or \
-                 result.error_code.val == MoveItErrorCodes.TIMED_OUT:
-                rospy.logerr('Place failed during execution, attempting to cleanup.')
-                if name in self._obj.getKnownAttachedObjects():
-                    rospy.loginfo('Place did not place object, approach must have failed, will retry...')
-                    attempts += 1
-                    continue
-                else:
-                    rospy.loginfo('Object no longer in gripper, must be placed, continuing...')
-                    break
-            else:
-                # unhandled error
-                rospy.logerr('Place failed with error code: %d.' % result.error_code.val)
-                # TODO: try to replace piece and replan?
-                return False
-        return True
 
     def execute(self, move, board):
         """ Execute a move. """
@@ -857,7 +800,7 @@ class ChessArmPlanner(Thread):
         if to_piece != None:
             # get name of piece
             to_id = board.getPieceId(to_piece)
-            print 'Capturing', to_id
+            print('Capturing', to_id)
 
             to = PoseStamped()
             to.header.stamp = rospy.Time.now() - rospy.Duration(1.0)
@@ -928,4 +871,3 @@ class ChessArmPlanner(Thread):
     def untuck(self):
         if joints_untucked:
             self._move.moveToJointPosition(joint_names, joints_untucked)
-

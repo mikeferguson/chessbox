@@ -2,7 +2,7 @@
 
 """ 
   Simple executive for playing AAAI robot chess
-  Copyright (c) 2011 Michael E. Ferguson.  All right reserved.
+  Copyright (c) 2011-2021 Michael E. Ferguson.  All right reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -22,11 +22,11 @@
 import sys
 import rospy
 
-from chess_player.chess_utilities import ArmPlanner
+from chess_player.chess_utilities import ChessArmPlanner
 
 if __name__=='__main__':
     rospy.init_node('tuck_arm')
-    p = ArmPlanner()
+    p = ChessArmPlanner()
     if "--u" in sys.argv:
         p.untuck()
     else:

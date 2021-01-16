@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """ 
-  Copyright (c) 2011 Michael E. Ferguson. All right reserved.
+  Copyright (c) 2011-2021 Michael E. Ferguson. All right reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -37,16 +37,16 @@ class SpeechEngine:
             self._sock.connect((self._host, self._port))
             self.conn = True
         except:
-            print "Cannot find Festival Server!"
-        
+            print("Cannot find Festival Server!")
+
     def close(self):
         if self.conn:
             self._sock.close()
-        
+
     def send(self, cmd):
         if self.conn:
             self._sock.send(cmd)
-    
+
     def voice(self, name):
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.open()
@@ -89,4 +89,3 @@ if __name__ == "__main__":
     se = SpeechEngine()
     #se.say("Moving knight from e6 to d4")
     se.say("ha ha ha")
-

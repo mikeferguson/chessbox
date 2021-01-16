@@ -2,7 +2,7 @@
 
 """ 
   Simple executive for playing AAAI robot chess
-  Copyright (c) 2011-2013 Michael E. Ferguson.  All right reserved.
+  Copyright (c) 2011-2021 Michael E. Ferguson.  All right reserved.
 
   This program is free software; you can redistribute it and/or modifyr
   it under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@
 """
 
 #ROBOT_NAME = "maxwell"
-ROBOT_NAME = "that_other_bot"
+ROBOT_NAME = "ubr-1"
 
 SQUARE_SIZE = 0.05715
 
@@ -59,7 +59,7 @@ if ROBOT_NAME == "maxwell":
     OFF_BOARD_Y = -SQUARE_SIZE
     OFF_BOARD_Z = 0.10
 
-elif ROBOT_NAME == "that_other_bot":
+elif ROBOT_NAME == "ubr-1":
     GROUP_NAME_ARM = 'arm'
     GROUP_NAME_GRIPPER = 'gripper'
 

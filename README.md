@@ -52,7 +52,7 @@ broken from time to time:
 
     rosrun chess_player chess_executive.py --sim
 
-## Running on that other robot
+## Running on UBR-1
 
     rosrun tf static_transform_publisher .4 .2286 .7366 -1.57 0 0 base_footprint chess_board 20
 

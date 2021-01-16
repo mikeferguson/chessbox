@@ -24,14 +24,20 @@ from __future__ import print_function
 import sys
 import rospy
 
-from chess_msgs.msg import *
+from chess_msgs.msg import ChessBoard
 from std_srvs.srv import *
 
-from tf.listener import *
+from tf.listener import TransformListener
 
-from chess_player.chess_utilities import *
-from chess_player.sound_utilities import *
-from chess_player.head_utilities import *
+from chess_player.chess_utilities import (
+    BoardState,
+    BoardUpdater,
+    ChessArmPlanner,
+    GnuChessEngine,
+    castling_extras
+)
+from chess_player.sound_utilities import SpeechEngine
+from chess_player.head_utilities import HeadEngine
 
 ###############################################################################
 # Executive for managing chess game
@@ -88,7 +94,7 @@ class ChessExecutive:
             print('Your move:')
         else:
             print('Invalid move, try again:')
-        self.board.last_move = raw_input().rstrip()
+        self.board.last_move = input().rstrip()
         if self.board.last_move == 'exit':
             self.engine.exit()
             exit()

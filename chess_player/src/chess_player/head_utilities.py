@@ -26,12 +26,12 @@ from sensor_msgs.msg import JointState
 from diagnostic_msgs.msg import DiagnosticArray
 
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
-from control_msgs.msg import *
+from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryGoal
 
-from robot_defs import *
+from robot_defs import head_joint_names, head_pose_look_at_board, head_pose_look_at_player
 
 class HeadEngine:   # a crazy name, but matches our convention
-    
+
     def __init__(self, client=None):
         self.joints = head_joint_names
         self.iter = 0
@@ -66,7 +66,7 @@ class HeadEngine:   # a crazy name, but matches our convention
         msg = JointTrajectory()
         msg.joint_names = self.joints
         msg.points = list()
-    
+
         point = JointTrajectoryPoint()
         point.positions = head_pose_look_at_board
         point.velocities = [0.0 for j in self.joints]
@@ -81,15 +81,15 @@ class HeadEngine:   # a crazy name, but matches our convention
 
     def wiggle_head(self):
         """ We always wiggle the first joint """
-        self.iter = (self.iter+1)%5
+        self.iter = (self.iter + 1) % 5
 
         msg = JointTrajectory()
         msg.joint_names = self.joints
         msg.points = list()
-    
+
         point = JointTrajectoryPoint()
         point.positions = head_pose_look_at_board
-        point.positions[0] += (self.iter-2)*0.05
+        point.positions[0] += (self.iter - 2) * 0.05
         point.velocities = [0.0 for j in self.joints]
         point.time_from_start = rospy.Duration(0.5)
         msg.points.append(point)
@@ -103,14 +103,12 @@ class HeadEngine:   # a crazy name, but matches our convention
 if __name__=="__main__":
     rospy.init_node("head_util_test")
     h = HeadEngine()
-    
+
     h.look_at_player()
     rospy.sleep(5.0)
     h.look_at_board()
     rospy.sleep(5.0)
-    
+
     for i in range(10):
         h.wiggle_head()
         rospy.sleep(2.0)
-
-
