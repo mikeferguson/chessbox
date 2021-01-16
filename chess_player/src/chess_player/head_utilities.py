@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """ 
-  Copyright (c) 2011 Michael E. Ferguson. All right reserved.
+  Copyright (c) 2011-2021 Michael E. Ferguson. All right reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -28,7 +28,7 @@ from diagnostic_msgs.msg import DiagnosticArray
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryGoal
 
-from robot_defs import head_joint_names, head_pose_look_at_board, head_pose_look_at_player
+from chess_player.robot_defs import head_joint_names, head_pose_look_at_board, head_pose_look_at_player
 
 class HeadEngine:   # a crazy name, but matches our convention
 

@@ -188,10 +188,10 @@ class BoardState:
         """ Determine which side of the board we are on. """
         side = 0
         for c in 'abcdefgh':
-            side += self.getPieceType(c,1)
-            side += self.getPieceType(c,2)
-            side -= self.getPieceType(c,7)
-            side -= self.getPieceType(c,8)
+            side += self.getPieceType(c, 1)
+            side += self.getPieceType(c, 2)
+            side -= self.getPieceType(c, 7)
+            side -= self.getPieceType(c, 8)
             rospy.loginfo("Computed side value of: %d" % side)
         if side > 0:
             self.side = self.WHITE   # good to go
@@ -203,26 +203,26 @@ class BoardState:
         # need to setup board
         temp_board = BoardState(self.side)
         for i in range(8):
-            temp_board.setPiece(i, 2, self.copyPiece(ChessPiece.WHITE_PAWN, self.getPiece(7-i, 7)) )
-            temp_board.setPiece(i, 7, self.copyPiece(ChessPiece.BLACK_PAWN, self.getPiece(7-i, 2)) )
+            temp_board.setPiece(i, 2, self.copyPiece(ChessPiece.WHITE_PAWN, self.getPiece(7-i, 7)))
+            temp_board.setPiece(i, 7, self.copyPiece(ChessPiece.BLACK_PAWN, self.getPiece(7-i, 2)))
 
-        temp_board.setPiece('a', 1, self.copyPiece(ChessPiece.WHITE_ROOK, self.getPiece('h',8)) )
-        temp_board.setPiece('b', 1, self.copyPiece(ChessPiece.WHITE_KNIGHT, self.getPiece('g',8)))
-        temp_board.setPiece('c', 1, self.copyPiece(ChessPiece.WHITE_BISHOP, self.getPiece('f',8)))
-        temp_board.setPiece('d', 1, self.copyPiece(ChessPiece.WHITE_QUEEN, self.getPiece('e',8)))
-        temp_board.setPiece('e', 1, self.copyPiece(ChessPiece.WHITE_KING, self.getPiece('d',8)))
-        temp_board.setPiece('f', 1, self.copyPiece(ChessPiece.WHITE_BISHOP, self.getPiece('c',8)))
-        temp_board.setPiece('g', 1, self.copyPiece(ChessPiece.WHITE_KNIGHT, self.getPiece('b',8)))
-        temp_board.setPiece('h', 1, self.copyPiece(ChessPiece.WHITE_ROOK, self.getPiece('a',8)))
+        temp_board.setPiece('a', 1, self.copyPiece(ChessPiece.WHITE_ROOK, self.getPiece('h', 8)))
+        temp_board.setPiece('b', 1, self.copyPiece(ChessPiece.WHITE_KNIGHT, self.getPiece('g', 8)))
+        temp_board.setPiece('c', 1, self.copyPiece(ChessPiece.WHITE_BISHOP, self.getPiece('f', 8)))
+        temp_board.setPiece('d', 1, self.copyPiece(ChessPiece.WHITE_QUEEN, self.getPiece('e', 8)))
+        temp_board.setPiece('e', 1, self.copyPiece(ChessPiece.WHITE_KING, self.getPiece('d', 8)))
+        temp_board.setPiece('f', 1, self.copyPiece(ChessPiece.WHITE_BISHOP, self.getPiece('c', 8)))
+        temp_board.setPiece('g', 1, self.copyPiece(ChessPiece.WHITE_KNIGHT, self.getPiece('b', 8)))
+        temp_board.setPiece('h', 1, self.copyPiece(ChessPiece.WHITE_ROOK, self.getPiece('a', 8)))
 
-        temp_board.setPiece('a', 8, self.copyPiece(ChessPiece.BLACK_ROOK, self.getPiece('h',1)) )
-        temp_board.setPiece('b', 8, self.copyPiece(ChessPiece.BLACK_KNIGHT, self.getPiece('g',1)) )
-        temp_board.setPiece('c', 8, self.copyPiece(ChessPiece.BLACK_BISHOP, self.getPiece('f',1)) )
-        temp_board.setPiece('d', 8, self.copyPiece(ChessPiece.BLACK_QUEEN, self.getPiece('e',1)) )
-        temp_board.setPiece('e', 8, self.copyPiece(ChessPiece.BLACK_KING, self.getPiece('d',1)) )
-        temp_board.setPiece('f', 8, self.copyPiece(ChessPiece.BLACK_BISHOP, self.getPiece('c',1)) )
-        temp_board.setPiece('g', 8, self.copyPiece(ChessPiece.BLACK_KNIGHT, self.getPiece('b',1)) )
-        temp_board.setPiece('h', 8, self.copyPiece(ChessPiece.BLACK_ROOK, self.getPiece('a',1)) )
+        temp_board.setPiece('a', 8, self.copyPiece(ChessPiece.BLACK_ROOK, self.getPiece('h', 1)))
+        temp_board.setPiece('b', 8, self.copyPiece(ChessPiece.BLACK_KNIGHT, self.getPiece('g', 1)))
+        temp_board.setPiece('c', 8, self.copyPiece(ChessPiece.BLACK_BISHOP, self.getPiece('f', 1)))
+        temp_board.setPiece('d', 8, self.copyPiece(ChessPiece.BLACK_QUEEN, self.getPiece('e', 1)))
+        temp_board.setPiece('e', 8, self.copyPiece(ChessPiece.BLACK_KING, self.getPiece('d', 1)))
+        temp_board.setPiece('f', 8, self.copyPiece(ChessPiece.BLACK_BISHOP, self.getPiece('c', 1)))
+        temp_board.setPiece('g', 8, self.copyPiece(ChessPiece.BLACK_KNIGHT, self.getPiece('b', 1)))
+        temp_board.setPiece('h', 8, self.copyPiece(ChessPiece.BLACK_ROOK, self.getPiece('a', 1)))
 
         self.values = temp_board.values
         self.printBoard()
@@ -231,7 +231,7 @@ class BoardState:
     # helpers
     def toPosition(self, pos):
         """ Get position for a string name like 'a1'. """
-        return [ord(pos[0])-ord('a'), int(pos[1])]
+        return [ord(pos[0]) - ord('a'), int(pos[1])]
 
     def getColName(self, col):
         """ Convert to column string name. """
@@ -536,7 +536,7 @@ class GnuChessEngine:
         """
         Start a connection to GNU chess.
         """
-        self.engine = pexpect.spawn('/usr/games/gnuchess -x')
+        self.engine = pexpect.spawn('/usr/games/gnuchess -x', timeout=5)
         self.history = list()
         self.pawning = False
         #self.nextMove = self.nextMoveUser
@@ -553,6 +553,7 @@ class GnuChessEngine:
         """
         # get move
         if self.pawning:
+            rospy.loginfo("We can't reach target, moving pawns instead")
             while not rospy.is_shutdown():
                 rows = [2,3,4,5]
                 piece = ChessPiece.WHITE_PAWN
@@ -570,11 +571,21 @@ class GnuChessEngine:
                                 self.history.append(m)
                                 return m
         else:
-            self.engine.sendline(move)
-            if self.engine.expect(['My move is','Illegal move']) == 1:
-                return None
-            self.engine.expect('([a-h][1-8][a-h][1-8][RrNnBbQq(\r\n)])')
-            m = self.engine.after.rstrip()
+            while True:
+                rospy.loginfo("Sending '%s' to gnuchess", move)
+                self.engine.sendline("depth 10")
+                self.engine.sendline(move)
+                try:
+                    if self.engine.expect(['My move is', 'Illegal move']) == 1:
+                        rospy.logerror(self.engine.before)
+                        return None
+                except pexpect.exceptions.TIMEOUT:
+                    rospy.logwarn("Timed out waiting for GNUChess")
+                    continue
+                self.engine.expect('([a-h][1-8][a-h][1-8][RrNnBbQq(\r\n)])')
+                m = self.engine.after.rstrip().decode()
+                rospy.loginfo("Recieved '%s' from gnuchess", m)
+                break
         self.history.append(m)
         return m
 
@@ -623,7 +634,7 @@ class ChessArmPlanner(Thread):
                 self._broadcaster.sendTransform(translation,
                                                 rotation,
                                                 rospy.Time.now(),
-                                                "chess_board",
+                                                self.CHESS_BOARD_FRAME,
                                                 "base_link")
             rospy.sleep(0.1)
 
@@ -743,7 +754,7 @@ class ChessArmPlanner(Thread):
                     pt = self.transform_pose(ps)
 
                     self._obj.addCylinder(board.getPieceId(p), height, radius, \
-                                          pt.pose.position.x, pt.pose.position.y, pt.pose.position.zx)
+                                          pt.pose.position.x, pt.pose.position.y, pt.pose.position.z)
                     if p.type < 0:
                         self._obj.setColor(board.getPieceId(p), 0, 0, 0)
                     else:

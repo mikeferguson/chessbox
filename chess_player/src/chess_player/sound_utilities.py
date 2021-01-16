@@ -45,7 +45,7 @@ class SpeechEngine:
 
     def send(self, cmd):
         if self.conn:
-            self._sock.send(cmd)
+            self._sock.send(cmd.encode())
 
     def voice(self, name):
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
