@@ -52,7 +52,7 @@ install(
     chess_perception
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
-  RUNTIME DESTINATION lib/${PACKAGE_NAME}
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
 ament_package()
