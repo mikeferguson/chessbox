@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2011-2021 Michael E. Ferguson.  All right reserved.
+Copyright (c) 2011-2024 Michael E. Ferguson.  All right reserved.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -19,19 +19,23 @@ Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 **/
 
 #include <chess_perception/board_finder.h>
+#include <chess_perception/conversions.h>
+#include <pcl_conversions/pcl_conversions.h>  // toROSMsg
 
-#include <ros/ros.h>
+#include <rclcpp/rclcpp.hpp>
 #include <math.h>
 
+static const rclcpp::Logger LOGGER = rclcpp::get_logger("board_finder");
+
 /** @brief Helper function to convert Eigen transformation to tf -- thanks to Garret Gallagher */
-tf::Transform tfFromEigen(Eigen::Matrix4f trans)
+tf2::Transform tfFromEigen(Eigen::Matrix4f trans)
 {
-  tf::Matrix3x3 mat;
+  tf2::Matrix3x3 mat;
   mat.setValue(trans(0,0),trans(0,1),trans(0,2),
                trans(1,0),trans(1,1),trans(1,2),
                trans(2,0),trans(2,1),trans(2,2));
-  tf::Transform ret;
-  ret.setOrigin(tf::Vector3(trans(0,3),trans(1,3),trans(2,3)));
+  tf2::Transform ret;
+  ret.setOrigin(tf2::Vector3(trans(0,3),trans(1,3),trans(2,3)));
   ret.setBasis(mat);
   return ret;
 }
@@ -58,56 +62,37 @@ double point_distance(pcl::PointXYZRGB p1, pcl::PointXYZRGB p2)
   return sqrt(pow(p1.z - p2.z, 2) + pow(p1.x - p2.x, 2) + pow(p1.y - p2.y, 2));
 }
 
-BoardFinder::BoardFinder()
+BoardFinder::BoardFinder(rclcpp::Node::SharedPtr node)
 {
-  ros::NodeHandle nh ("~");
-
   // Load parameters
-  if (!nh.getParam ("board_color", channel_))
-  {
-    channel_ = 0; // blue
-  }
-  if (!nh.getParam ("point_threshold", point_threshold_))
-  {
-    point_threshold_ = 42;
-  }
+  channel_ = node->declare_parameter<int>("board_color", 0);  // Default is blue
+  point_threshold_ = node->declare_parameter<int>("point_threshold", 42);
 
   // Load parameters for hough transform
-  if (!nh.getParam ("h_rho", h_rho_))
-  {
-    h_rho_ = 1;
-  }
-  ROS_INFO ("Hough Rho: %d", h_rho_);
-
-  if (!nh.getParam ("h_threshold", h_threshold_))
-  {
-    h_threshold_ = 50;
-  }
-  ROS_INFO ("Hough Threshold: %d", h_threshold_);
-
-  if (!nh.getParam ("h_min_length", h_min_length_))
-  {
-    h_min_length_ = 100;
-  }
-  ROS_INFO ("Hough Min Length: %d", h_min_length_);
+  h_rho_ = node->declare_parameter<int>("h_rho", 1);
+  h_threshold_ = node->declare_parameter<int>("h_threshold", 50);
+  h_min_length_ = node->declare_parameter<int>("h_min_length", 100);
+  RCLCPP_INFO(LOGGER, "Hough Rho: %d", h_rho_);
+  RCLCPP_INFO(LOGGER, "Hough Threshold: %d", h_threshold_);
+  RCLCPP_INFO(LOGGER, "Hough Min Length: %d", h_min_length_);
 
   debug_ = true;
 
   // Debug image output
   if (debug_)
   {
-    image_transport::ImageTransport it(nh);
+    image_transport::ImageTransport it(node);
     image_pub_ = it.advertise("board_finder_image", 1);
-    cloud_pub_ = nh.advertise< pcl::PointCloud<pcl::PointXYZRGB> >("board_finder_cloud", 1);
+    cloud_pub_ = node->create_publisher<sensor_msgs::msg::PointCloud2>("board_finder_cloud", 1);
   }
 }
 
 bool BoardFinder::findBoard(
   pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
-  tf::Transform& board)
+  tf2::Transform& board)
 {
   // Get an OpenCV image from the cloud
-  sensor_msgs::ImagePtr image_msg(new sensor_msgs::Image);
+  sensor_msgs::msg::Image::SharedPtr image_msg(new sensor_msgs::msg::Image);
   pcl_broke_again::toROSMsg(*cloud, *image_msg);
   try
   {
@@ -115,7 +100,7 @@ bool BoardFinder::findBoard(
   }
   catch (cv_bridge::Exception& e)
   {
-    ROS_ERROR("Conversion failed");
+    RCLCPP_ERROR(LOGGER, "Conversion failed");
   }
 
   // Segment based on a channel (blue board squares)
@@ -142,7 +127,7 @@ bool BoardFinder::findBoard(
   // Do a hough transformation to find lines
   std::vector<cv::Vec4i> lines;
   cv::HoughLinesP(dst, lines, h_rho_, CV_PI/180, h_threshold_, h_min_length_, 10);
-  ROS_DEBUG("Found %d lines", (int) lines.size());
+  RCLCPP_DEBUG(LOGGER, "Found %d lines", static_cast<int>(lines.size()));
 
   // Split into vertical/horizontal lines
   std::vector<cv::Vec4i> h_lines, v_lines;
@@ -213,7 +198,7 @@ bool BoardFinder::findBoard(
     cv::cvtColor(src, cdst, CV_GRAY2BGR);
 
     // Then blue/green for horizontal/vertical
-    ROS_DEBUG("horizontal lines: %d", (int) h_lines.size());
+    RCLCPP_DEBUG(LOGGER, "horizontal lines: %d", static_cast<int>(h_lines.size()));
     for (size_t i = 0; i < h_lines.size(); ++i)
     {
       cv::Vec4i l = h_lines[i];
@@ -226,7 +211,7 @@ bool BoardFinder::findBoard(
         cv::line(cdst, cv::Point(l[0], l[1]), cv::Point(l[2], l[3]), cv::Scalar(255,0,255), 2, cv::LineTypes::LINE_AA);
       }
     }
-    ROS_DEBUG("vertical lines: %d", (int) v_lines.size());
+    RCLCPP_DEBUG(LOGGER, "vertical lines: %d", static_cast<int>(v_lines.size()));
     for (size_t i = 0; i < v_lines.size(); ++i)
     {
       cv::Vec4i l = v_lines[i];
@@ -345,7 +330,7 @@ bool BoardFinder::findBoard(
   // We need some data from each row
   if (corner_points_2d.size() < 7)
   {
-    ROS_WARN("Board Finder: Missing an entire row");
+    RCLCPP_WARN(LOGGER, "Board Finder: Missing an entire row");
     return false;
   }
 
@@ -399,12 +384,14 @@ bool BoardFinder::findBoard(
 
   // TODO: handle missing points at the beginning of a row
 
-  ROS_DEBUG_STREAM("Board Finder: Found " << points.size() << " 3d points");
+  RCLCPP_DEBUG(LOGGER, "Board Finder: Found %lu 3d points", points.size());
 
   if (debug_)
   {
     points.header = cloud->header;
-    cloud_pub_.publish(points);
+    sensor_msgs::msg::PointCloud2 msg;
+    pcl::toROSMsg(points, msg);
+    cloud_pub_->publish(msg);
   }
 
   if (static_cast<int>(points.size()) < point_threshold_)
@@ -428,7 +415,7 @@ bool BoardFinder::findBoard(
   // Occasionally, we hit this, mainly due to motion
   if (points.size() != ideal.size())
   {
-    ROS_WARN_STREAM("Board Finder: Failed size check: " << points.size() << " vs " << ideal.size());
+    RCLCPP_WARN(LOGGER, "Board Finder: Failed size check: %lu vs %lu", points.size(), ideal.size());
     return false;
   }
 

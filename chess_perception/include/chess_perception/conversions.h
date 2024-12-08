@@ -46,7 +46,7 @@ namespace pcl_broke_again
  */
 
 template<typename CloudT> void
-toROSMsg (const CloudT& cloud, sensor_msgs::Image& msg)
+toROSMsg (const CloudT& cloud, sensor_msgs::msg::Image& msg)
 {
   // Ease the user's burden on specifying width/height for unorganized datasets
   if (cloud.width == 0 && cloud.height == 0)

@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2011-2021 Michael E. Ferguson.  All right reserved.
+Copyright (c) 2011-2024 Michael E. Ferguson.  All right reserved.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -21,17 +21,15 @@ Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #ifndef CHESS_PERCEPTION_POINT_FINDER_H
 #define CHESS_PERCEPTION_POINT_FINDER_H
 
-#include <ros/ros.h>
-#include <tf/transform_broadcaster.h> // TODO: find appropriate include file
+#include <rclcpp/rclcpp.hpp>
+#include <sensor_msgs/msg/point_cloud2.hpp>
+#include <tf2/LinearMath/Transform.h>
 
 #include <pcl/point_types.h>
-#include <pcl_ros/point_cloud.h>
-#include <pcl_conversions/pcl_conversions.h>
-#include <chess_perception/conversions.h>
-#include <cv_bridge/cv_bridge.h>
+#include <cv_bridge/cv_bridge.hpp>
 
 #include <opencv2/opencv.hpp>
-#include <image_transport/image_transport.h>
+#include <image_transport/image_transport.hpp>
 
 #include <pcl/registration/transformation_estimation_svd.h>
 
@@ -41,12 +39,12 @@ Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 class BoardFinder
 {
 public:
-  BoardFinder();
+  BoardFinder(rclcpp::Node::SharedPtr node);
   virtual ~BoardFinder() {};
 
   /** @brief Find the potential points in the image. */
   bool findBoard(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
-                 tf::Transform& board);
+                 tf2::Transform& board);
 
   /** @brief Set the size of a square on our chess board. */
   void setSquareSize(double size) { square_size_ = size; }
@@ -78,7 +76,7 @@ private:
   // Configuration
   bool debug_;
 
-  ros::Publisher cloud_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr cloud_pub_;
   image_transport::Publisher image_pub_;
   cv_bridge::CvImagePtr bridge_;
 

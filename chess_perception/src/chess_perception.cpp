@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2011-2021 Michael E. Ferguson.  All right reserved.
+Copyright (c) 2011-2024 Michael E. Ferguson.  All right reserved.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -18,20 +18,22 @@ Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 **/
 
-#include <ros/ros.h>
-#include <sensor_msgs/PointCloud2.h>
-#include <tf/transform_broadcaster.h>
-#include <tf/transform_listener.h>
+#include <rclcpp/rclcpp.hpp>
+#include <sensor_msgs/msg/point_cloud2.hpp>
+#include <tf2_ros/transform_broadcaster.h>
+#include <tf2_ros/transform_listener.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 #include <pcl/point_types.h>
-#include <pcl_ros/point_cloud.h>
-#include <pcl_ros/transforms.h>
+#include <pcl_ros/transforms.hpp>
 #include <pcl_conversions/pcl_conversions.h>
 
 #include <chess_perception/piece_finder.h>
 #include <chess_perception/board_finder.h>
 
-#include <chess_msgs/ChessBoard.h>
+#include <chess_msgs/msg/chess_board.hpp>
+
+static const rclcpp::Logger LOGGER = rclcpp::get_logger("chess_perception");
 
 /**
  * @brief This class handles the estimation, and ties together the other
@@ -40,44 +42,42 @@ Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 class ChessPerception
 {
 public:
-  ChessPerception(ros::NodeHandle & n): nh_ (n)
+  ChessPerception(rclcpp::Node::SharedPtr node): node_(node), board_finder_(node), piece_finder_(node)
   {
     // Initialize cached data to something reasonable
     board_to_fixed_.setIdentity();
     frames_ = 0;
     debug_ = true;
 
-    // Load global parameters
-    double square_size;
-    if (!n.getParam ("chess_square_size", square_size))
-    {
-      square_size = 0.05715;
-    }
+    // Setup TF
+    br_ = std::make_unique<tf2_ros::TransformBroadcaster>(node_);
+    buffer_ = std::make_unique<tf2_ros::Buffer>(node_->get_clock());
+    listener_ = std::make_unique<tf2_ros::TransformListener>(*buffer_);
+
+    // Load parameters
+    skip_ = node_->declare_parameter<int>("skip", 2);
+    fixed_frame_ = node_->declare_parameter<std::string>("fixed_frame", "base_link");
+    double square_size = node_->declare_parameter<double>("chess_square_size", 0.5715);
     board_finder_.setSquareSize(square_size);
     piece_finder_.setSquareSize(square_size);
 
-    // Load local parameters
-    ros::NodeHandle nh ("~");
-    if (!nh.getParam ("skip", skip_))
-    {
-      skip_ = 2;
-    }
-    if (!nh.getParam ("fixed_frame", fixed_frame_))
-    {
-      fixed_frame_ = "base_link";
-    }
-
     // Subscribe to just the cloud now
-    cloud_sub_ = nh_.subscribe("/head_camera/depth_registered/points", 1, &ChessPerception::cameraCallback, this);
-    output_ = nh_.advertise<chess_msgs::ChessBoard>("chess_board_state", 1);
+    cloud_sub_ = node_->create_subscription<sensor_msgs::msg::PointCloud2>(
+      "/head_camera/depth_registered/points",
+      rclcpp::QoS(1).best_effort(),
+      std::bind(&ChessPerception::cameraCallback, this, std::placeholders::_1));
 
-    /* Periodic callback to publish tf */
-    publish_timer_ = nh_.createWallTimer(ros::WallDuration(1.0 / 30.0),
-                                         boost::bind(&ChessPerception::publishCallback, this, _1));
+    // Publish board output
+    output_ = node_->create_publisher<chess_msgs::msg::ChessBoard>("chess_board_state", 1);
+
+    // Periodic callback to publish tf
+    publish_timer_ = node_->create_wall_timer(
+      std::chrono::milliseconds(33),
+      std::bind(&ChessPerception::publishCallback, this));
   }
 
   /** @brief Main loop */
-  void cameraCallback(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud)
+  void cameraCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
   {
     if ((frames_++ % skip_) != 0)
     {
@@ -85,16 +85,21 @@ public:
     }
 
     // Get transform from camera->fixed
-    tf::StampedTransform tr2;
+    tf2::Transform tr2;
     try
     {
-      listener_.lookupTransform(fixed_frame_, cloud->header.frame_id, ros::Time(0), tr2);
+      auto t = buffer_->lookupTransform(fixed_frame_, msg->header.frame_id, tf2::TimePointZero);
+      tf2::fromMsg(t.transform, tr2);
     }
-    catch (tf::TransformException& ex)
+    catch (tf2::TransformException& ex)
     {
-      ROS_ERROR("%s", ex.what());
+      RCLCPP_ERROR(LOGGER, "%s", ex.what());
       return;
     }
+
+    // Convert to point cloud
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = std::make_shared<pcl::PointCloud<pcl::PointXYZRGB>>();
+    pcl::fromROSMsg(*msg, *cloud);
 
     /*
      * Find potential corner points of board.
@@ -102,12 +107,13 @@ public:
      * We do this first, so if it fails we can abort the slower table/piece finding.
      */
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr corner_points(new pcl::PointCloud<pcl::PointXYZRGB>);
-    tf::Transform tr;
+    tf2::Transform tr;
     if (!board_finder_.findBoard(cloud, tr))
     {
-      ROS_WARN_THROTTLE(1, "Unable to detect chess board.");
+      RCLCPP_WARN(LOGGER, "Unable to detect chess board.");
       return;
     }
+
     // Update board estimate
     board_to_fixed_ = tr2 * tr;
 
@@ -117,65 +123,63 @@ public:
     size_t piece_count = piece_finder_.findPieces(cloud, tr, pieces, weights);
     if (piece_count == 0)
     {
-      ROS_WARN_THROTTLE(1, "Unable to detect pieces.");
+      RCLCPP_WARN(LOGGER, "Unable to detect pieces.");
       return;
     }
-    ROS_DEBUG_STREAM("Found " << piece_count << " pieces.");
+    RCLCPP_DEBUG(LOGGER, "Found %lu pieces.", piece_count);
 
     // Publish piece and transform estimate
-    chess_msgs::ChessBoard cb;
+    chess_msgs::msg::ChessBoard cb;
     for (size_t i = 0; i < piece_count; ++i)
     {
-      chess_msgs::ChessPiece p;
-      p.header = pcl_conversions::fromPCL(cloud->header);
+      chess_msgs::msg::ChessPiece p;
+      p.header = msg->header;
       p.header.frame_id = "chess_board";
       p.pose.position.x = pieces[i].x;
       p.pose.position.y = pieces[i].y;
       p.pose.position.z = pieces[i].z;
       if (weights[i] > 0)
       {
-        p.type = chess_msgs::ChessPiece::WHITE_UNKNOWN;
+        p.type = chess_msgs::msg::ChessPiece::WHITE_UNKNOWN;
       }
       else
       {
-        p.type = chess_msgs::ChessPiece::BLACK_UNKNOWN;
+        p.type = chess_msgs::msg::ChessPiece::BLACK_UNKNOWN;
       }
       cb.pieces.push_back(p);
     }
     cb.board_to_fixed.header.frame_id = fixed_frame_;
-    cb.board_to_fixed.header.stamp = ros::Time::now();
+    cb.board_to_fixed.header.stamp = node_->now();
     cb.board_to_fixed.child_frame_id = "chess_board";
-    cb.board_to_fixed.transform.translation.x = board_to_fixed_.getOrigin().getX();  // TODO: is this actually board_to_fixed, or fixed_to_board?
-    cb.board_to_fixed.transform.translation.y = board_to_fixed_.getOrigin().getY();
-    cb.board_to_fixed.transform.translation.z = board_to_fixed_.getOrigin().getZ();
-    cb.board_to_fixed.transform.rotation.x = board_to_fixed_.getRotation().getX();
-    cb.board_to_fixed.transform.rotation.y = board_to_fixed_.getRotation().getY();
-    cb.board_to_fixed.transform.rotation.z = board_to_fixed_.getRotation().getZ();
-    cb.board_to_fixed.transform.rotation.w = board_to_fixed_.getRotation().getW();
-    output_.publish(cb);
+    cb.board_to_fixed.transform = tf2::toMsg(board_to_fixed_);
+    output_->publish(cb);
   }
 
   /** @brief Periodic callback to publish tf data */
-  void publishCallback(const ros::WallTimerEvent& event)
+  void publishCallback()
   {
-    br_.sendTransform(tf::StampedTransform(board_to_fixed_, ros::Time::now(), fixed_frame_, "chess_board_estimate"));
+    geometry_msgs::msg::TransformStamped transform;
+    transform.header.stamp = node_->now();
+    transform.header.frame_id = fixed_frame_;
+    transform.child_frame_id = "chess_board_estimate";
+    transform.transform = tf2::toMsg(board_to_fixed_);
+    br_->sendTransform(transform);
   }
 
 private:
   // Node handles, subscribers, publishers, etc
-  ros::NodeHandle nh_;
-  ros::Subscriber cloud_sub_;
-  ros::Publisher cloud_pub_;
-  ros::Publisher output_;
-  ros::Publisher projected_points_cloud_pub_;
-  ros::WallTimer publish_timer_;
-  tf::TransformBroadcaster br_;
-  tf::TransformListener listener_;
+  rclcpp::Node::SharedPtr node_;
+  rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr cloud_sub_;
+  rclcpp::Publisher<chess_msgs::msg::ChessBoard>::SharedPtr output_;
+  rclcpp::TimerBase::SharedPtr publish_timer_;
+  std::unique_ptr<tf2_ros::TransformBroadcaster> br_;
+  std::unique_ptr<tf2_ros::Buffer> buffer_;
+  std::unique_ptr<tf2_ros::TransformListener> listener_;
 
   // The frame to cache and republish in (typically "base_link")
   std::string fixed_frame_;
   // The actual cached transform to publish
-  tf::Transform board_to_fixed_;
+  tf2::Transform board_to_fixed_;
 
   int skip_;
   unsigned int frames_;
@@ -188,9 +192,9 @@ private:
 
 int main (int argc, char **argv)
 {
-  ros::init(argc, argv, "chess_perception_node");
-  ros::NodeHandle n;
-  ChessPerception perception(n);
-  ros::spin();
+  rclcpp::init(argc, argv);
+  rclcpp::Node::SharedPtr node = std::make_shared<rclcpp::Node>("chess_perception_node");
+  ChessPerception perception(node);
+  rclcpp::spin(node);
   return 0;
 }

@@ -6,7 +6,7 @@
   </description>
   <author>Michael Ferguson</author>
   <maintainer email="mike@vanadiumlabs.com">Michael Ferguson</maintainer>
-  <license>BSD-3-Clause</license>
+  <license>GPL</license>
   <url>http://ros.org/wiki/chess_msgs</url>
   
   <buildtool_depend>ament_cmake</buildtool_depend>

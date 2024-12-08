@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2011-2021 Michael E. Ferguson.  All right reserved.
+Copyright (c) 2011-2024 Michael E. Ferguson.  All right reserved.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -21,14 +21,15 @@ Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #ifndef CHESS_PERCEPTION_PIECE_FINDER_H
 #define CHESS_PERCEPTION_PIECE_FINDER_H
 
-#include <ros/ros.h>
-#include <pcl_ros/point_cloud.h>
-#include <pcl_ros/transforms.h>
+#include <rclcpp/rclcpp.hpp>
+#include <sensor_msgs/msg/point_cloud2.hpp>
+#include <pcl_ros/transforms.hpp>
 #include <pcl/point_types.h>
 #include <pcl/PointIndices.h>
 #include <pcl/segmentation/extract_polygonal_prism_data.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/segmentation/extract_clusters.h>
+#include <tf2/LinearMath/Transform.h>
 
 /** \class PieceFinder
  *  \brief Finds the pieces.
@@ -36,7 +37,7 @@ Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 class PieceFinder
 {
 public:
-  PieceFinder();
+  PieceFinder(rclcpp::Node::SharedPtr node);
   virtual ~PieceFinder() {};
 
   /**
@@ -44,7 +45,7 @@ public:
    * @returns number of pieces found.
    */
   size_t findPieces(pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
-                    tf::Transform& board_transform,
+                    tf2::Transform& board_transform,
                     std::vector<pcl::PointXYZ>& pieces,
                     std::vector<double>& weights);
 
@@ -62,7 +63,7 @@ private:
   pcl::ExtractIndices<pcl::PointXYZRGB> extract_indices_;
   pcl::EuclideanClusterExtraction<pcl::PointXYZRGB> cluster_;
 
-  ros::Publisher pieces_cloud_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pieces_cloud_pub_;
   pcl::PointCloud<pcl::PointXYZRGB> hull_untransformed_;
 };
 

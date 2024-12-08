@@ -1,6 +1,6 @@
 /**
 
-Copyright (c) 2011-2013 Michael E. Ferguson.  All right reserved.
+Copyright (c) 2011-2024 Michael E. Ferguson.  All right reserved.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -19,6 +19,9 @@ Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 **/
 
 #include <chess_perception/piece_finder.h>
+#include <pcl_conversions/pcl_conversions.h>  // toROSMsg
+
+static const rclcpp::Logger LOGGER = rclcpp::get_logger("piece_finder");
 
 // see
 // http://en.wikipedia.org/wiki/HSL_and_HSV#Converting_to_RGB
@@ -61,20 +64,15 @@ static void hsv2rgb(float h, float s, float v, float& r, float& g, float& b)
   r += m; g+=m; b+=m;
 }
 
-PieceFinder::PieceFinder() : square_size_(0.05715)
+PieceFinder::PieceFinder(rclcpp::Node::SharedPtr node) : square_size_(0.05715)
 {
-  ros::NodeHandle nh ("~");
-
   debug_ = true;
 
-  if (!nh.getParam("color_threshold", threshold_))
-  {
-    threshold_ = 70;
-  }
+  threshold_ = node->declare_parameter<int>("color_threshold", 70);
 
   if (debug_)
   {
-    pieces_cloud_pub_ = nh.advertise<pcl::PointCloud<pcl::PointXYZRGB>>("pieces", 1);
+    pieces_cloud_pub_ = node->create_publisher<sensor_msgs::msg::PointCloud2>("pieces", 1);
   }
 
   setupUntransformedHull();
@@ -115,7 +113,7 @@ void PieceFinder::setSquareSize(double size)
 
 size_t PieceFinder::findPieces(
   pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud,
-  tf::Transform& board_transform,
+  tf2::Transform& board_transform,
   std::vector<pcl::PointXYZ>& pieces,
   std::vector<double>& weights)
 {
@@ -135,7 +133,7 @@ size_t PieceFinder::findPieces(
   extract_indices_.setInputCloud(cloud);
   extract_indices_.setIndices(inliers);
   extract_indices_.filter(*cloud_pieces);
-  ROS_DEBUG_STREAM("Piece Finder: Extract points has " << cloud_pieces->size() << " points.");
+  RCLCPP_DEBUG(LOGGER, "Piece Finder: Extract points has %lu points.", cloud_pieces->size());
 
   // Transform points into chess board frame
   pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_transformed(new pcl::PointCloud<pcl::PointXYZRGB>);
@@ -150,7 +148,7 @@ size_t PieceFinder::findPieces(
   cluster_.setInputCloud(cloud_transformed);
   cluster_.extract(clusters);
 
-  ROS_DEBUG_STREAM("Piece Finder: Extracted " << clusters.size() << " clusters.");
+  RCLCPP_DEBUG(LOGGER, "Piece Finder: Extracted %lu clusters.", clusters.size());
 
   /* Merge clusters vertically, determine centroids and weights */
   std::vector<double> cluster_min_x;
@@ -231,7 +229,7 @@ size_t PieceFinder::findPieces(
     }
   }
 
-  ROS_DEBUG_STREAM("Piece Finder: Found " << weights.size() << " clusters.");
+  RCLCPP_DEBUG(LOGGER, "Piece Finder: Found %lu clusters.", weights.size());
 
   if (debug_)
   {
@@ -265,7 +263,9 @@ size_t PieceFinder::findPieces(
         }
       }
     }
-    pieces_cloud_pub_.publish(cluster_cloud);
+    sensor_msgs::msg::PointCloud2 cluster_msg;
+    pcl::toROSMsg(cluster_cloud, cluster_msg);
+    pieces_cloud_pub_->publish(cluster_msg);
   }
 
   return weights.size();
