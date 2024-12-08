@@ -6,14 +6,7 @@ This is the n-th generation chess code, which was originally developed for AAAI 
 
     sudo apt-get install gnuchess gnuchess-book python3-pexpect
     sudo apt-get install festlex-cmu
-    sudo apt-get install ros-noetic-moveit-full ros-noetic-moveit-python
-
-    cd <catkin_ws>/src
-    wstool init
-    wstool merge https://raw.github.com/mikeferguson/chessbox/master/maxwell.rosinstall
-    wstool update
-    cd ..
-    catkin_make
+    sudo apt-get install ros-jazzy-moveit2
 
 ## Setup for festival
 
@@ -21,13 +14,6 @@ This is the n-th generation chess code, which was originally developed for AAAI 
     sudo wget -c http://www.speech.cs.cmu.edu/cmu_arctic/packed/cmu_us_awb_arctic-0.95-release.tar.bz2
     sudo tar jxf cmu_us_awb_arctic-0.95-release.tar.bz2 
     sudo ln -s cmu_us_awb_arctic cmu_us_awb_arctic_clunits
-
-## Running on Maxwell -- pretty much only I can do this...
-
-    roslaunch maxwell_defs bringup_maxwell.launch
-    roslaunch maxwell_defs head_camera.launch
-    roslaunch maxwell_moveit_config move_group.launch
-    roslaunch chess_player play.launch
 
 ## Running without the robot
 You can startup most of the pipeline without having a Maxwell:
@@ -55,6 +41,7 @@ broken from time to time:
 ## Running on UBR-1
 
     rosrun tf static_transform_publisher .4 .2286 .7366 -1.57 0 0 base_link chess_board 20
+    roslaunch chess_player play.launch
 
 ## Adapting to a new robot
 Much of this code is robot-independent. Below I list the files known not to be (in other words, if the file

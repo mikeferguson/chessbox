@@ -1,5 +1,5 @@
 # A pose, reference frame, timestamp, and type
-Header header
+std_msgs/Header header
 geometry_msgs/Pose pose
 int32 type
 
