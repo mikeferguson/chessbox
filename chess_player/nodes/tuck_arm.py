@@ -20,13 +20,14 @@
 """
 
 import sys
-import rospy
+import rclpy
 
-from chess_player.chess_utilities import ChessArmPlanner
+from chess_player.grasp_utilities import ChessArmPlanner
 
 if __name__=='__main__':
-    rospy.init_node('tuck_arm')
-    p = ChessArmPlanner()
+    rclpy.init()
+    node = rclpy.create_node('tuck_arm')
+    p = ChessArmPlanner(node)
     if "--u" in sys.argv:
         p.untuck()
     else:

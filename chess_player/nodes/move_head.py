@@ -1,8 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """ 
   Simple executive for playing AAAI robot chess
-  Copyright (c) 2011 Michael E. Ferguson.  All right reserved.
+  Copyright (c) 2011-2024 Michael E. Ferguson.  All right reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -20,14 +20,18 @@
 """
 
 import sys
-import rospy
+import rclpy
 
 from chess_player.head_utilities import HeadEngine
 
 if __name__=='__main__':
-    rospy.init_node('tilt_head')
-    h = HeadEngine()
+    rclpy.init()
+    node = rclpy.create_node('tilt_head')
+    h = HeadEngine(node)
     if 'up' in sys.argv:
         h.look_at_player()
+    elif 'wiggle' in sys.argv:
+        for i in range(10):
+            h.wiggle_head()
     else:
         h.look_at_board()

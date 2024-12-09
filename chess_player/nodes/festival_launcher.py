@@ -1,6 +1,5 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
-import socket, sys 
 import subprocess
 
 subprocess.call(["festival", "--server"])

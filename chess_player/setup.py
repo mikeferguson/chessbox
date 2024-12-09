@@ -1,11 +1,18 @@
-#!/usr/bin/env python
+from setuptools import setup
 
-from distutils.core import setup
-from catkin_pkg.python_setup import generate_distutils_setup
-
-d = generate_distutils_setup(
-    packages=['chess_player'],
-    package_dir={'': 'src'},
-    )
-
-setup(**d)
+package_name = 'chess_player'
+setup(
+    name=package_name,
+    version='0.3.0',
+    packages=[package_name],
+    data_files=[
+        ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
+        ('share/' + package_name, ['package.xml']),
+    ],
+    install_requires=['setuptools'],
+    zip_safe=True,
+    maintainer='Michael Ferguson',
+    maintainer_email='mike@vanadiumlabs.com',
+    description='Executive for AAAI Chess 2011',
+    license='GPL',
+)

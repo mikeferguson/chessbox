@@ -1,8 +1,6 @@
-#!/usr/bin/env python
-
 """ 
   Simple executive for playing AAAI robot chess
-  Copyright (c) 2011-2021 Michael E. Ferguson.  All right reserved.
+  Copyright (c) 2011-2024 Michael E. Ferguson.  All right reserved.
 
   This program is free software; you can redistribute it and/or modifyr
   it under the terms of the GNU General Public License as published by

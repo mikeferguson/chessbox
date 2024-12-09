@@ -1,7 +1,5 @@
-#!/usr/bin/env python
-
 """ 
-  Copyright (c) 2011-2021 Michael E. Ferguson. All right reserved.
+  Copyright (c) 2011-2024 Michael E. Ferguson. All right reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -18,29 +16,27 @@
   Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 """
 
-import rospy
-import actionlib
+import rclpy
+from rclpy.duration import Duration
+from simple_actions import SimpleActionClient
 import sys
 
-from sensor_msgs.msg import JointState
-from diagnostic_msgs.msg import DiagnosticArray
-
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
-from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryGoal
+from control_msgs.action import FollowJointTrajectory
 
 from chess_player.robot_defs import head_joint_names, head_pose_look_at_board, head_pose_look_at_player
 
 class HeadEngine:   # a crazy name, but matches our convention
 
-    def __init__(self, client=None):
+    def __init__(self, node, client=None):
+        self.node = node
         self.joints = head_joint_names
         self.iter = 0
 
         if client != None:
             self._client = client
         else:
-            self._client = actionlib.SimpleActionClient('head_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
-        self._client.wait_for_server()
+            self._client = SimpleActionClient(node, FollowJointTrajectory, 'head_controller/follow_joint_trajectory')
 
     #######################################################
     # look at person/board
@@ -52,15 +48,14 @@ class HeadEngine:   # a crazy name, but matches our convention
         point = JointTrajectoryPoint()
         point.positions = head_pose_look_at_player
         point.velocities = [0.0 for j in self.joints]
-        point.time_from_start = rospy.Duration(3.0)
+        point.time_from_start = Duration(seconds=3).to_msg()
         msg.points.append(point)
 
-        msg.header.stamp = rospy.Time.now()
+        msg.header.stamp = self.node.get_clock().now().to_msg()
 
-        goal = FollowJointTrajectoryGoal()
+        goal = FollowJointTrajectory.Goal()
         goal.trajectory = msg
-        self._client.send_goal(goal)
-        rospy.sleep(3.0)
+        result = self._client(goal)
 
     def look_at_board(self):
         msg = JointTrajectory()
@@ -70,14 +65,14 @@ class HeadEngine:   # a crazy name, but matches our convention
         point = JointTrajectoryPoint()
         point.positions = head_pose_look_at_board
         point.velocities = [0.0 for j in self.joints]
-        point.time_from_start = rospy.Duration(3.0)
+        point.time_from_start = Duration(seconds=3).to_msg()
         msg.points.append(point)
 
-        msg.header.stamp = rospy.Time.now()
+        msg.header.stamp = self.node.get_clock().now().to_msg()
 
-        goal = FollowJointTrajectoryGoal()
+        goal = FollowJointTrajectory.Goal()
         goal.trajectory = msg
-        self._client.send_goal(goal)
+        result = self._client(goal)
 
     def wiggle_head(self):
         """ We always wiggle the first joint """
@@ -91,24 +86,12 @@ class HeadEngine:   # a crazy name, but matches our convention
         point.positions = head_pose_look_at_board
         point.positions[0] += (self.iter - 2) * 0.05
         point.velocities = [0.0 for j in self.joints]
-        point.time_from_start = rospy.Duration(0.5)
+        point.time_from_start = Duration(seconds=1).to_msg()
         msg.points.append(point)
 
-        msg.header.stamp = rospy.Time.now() + rospy.Duration(0.1)
+        msg.header.stamp = self.node.get_clock().now().to_msg()
 
-        goal = FollowJointTrajectoryGoal()
+        goal = FollowJointTrajectory.Goal()
         goal.trajectory = msg
-        self._client.send_goal(goal)
-    
-if __name__=="__main__":
-    rospy.init_node("head_util_test")
-    h = HeadEngine()
+        result = self._client(goal)
 
-    h.look_at_player()
-    rospy.sleep(5.0)
-    h.look_at_board()
-    rospy.sleep(5.0)
-
-    for i in range(10):
-        h.wiggle_head()
-        rospy.sleep(2.0)

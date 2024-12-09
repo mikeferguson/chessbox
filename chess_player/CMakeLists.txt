@@ -1,9 +1,17 @@
-cmake_minimum_required(VERSION 3.0.2)
+cmake_minimum_required(VERSION 3.5)
 project(chess_player)
 
-find_package(catkin)
+find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_python REQUIRED)
 
-catkin_package()
-catkin_python_setup()
+install(
+  PROGRAMS
+    nodes/chess_executive.py
+    nodes/festival_launcher.py
+    nodes/move_head.py
+    nodes/tuck_arm.py
+  DESTINATION lib/${PROJECT_NAME}
+)
 
-# TODO: add install directives
+ament_python_install_package(${PROJECT_NAME})
+ament_package()

@@ -1,7 +1,5 @@
-#!/usr/bin/env python
-
 """ 
-  Copyright (c) 2011-2021 Michael E. Ferguson. All right reserved.
+  Copyright (c) 2011-2024 Michael E. Ferguson. All right reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -78,14 +76,3 @@ class MPlayer(Thread):
 
     def run(self):
         subprocess.call(["mplayer", self.name])
-
-
-if __name__ == "__main__":
-    import time
-    #MPlayer("../clips/openings/centuryfox.wav")
-    #for i in range(10):
-    #    print "hello"
-    #    time.sleep(1)
-    se = SpeechEngine()
-    #se.say("Moving knight from e6 to d4")
-    se.say("ha ha ha")
